@@ -1,0 +1,24 @@
+# Python / uv
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+.venv/
+.pytest_cache/
+
+# Secrets and local config (never commit; see .env.example)
+.env
+
+# Large artifacts: checkpoints go to Hugging Face, datasets are regenerated from seeds
+checkpoints/
+data/
+*.pt
+*.safetensors
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
