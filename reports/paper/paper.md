@@ -11,7 +11,7 @@ Looped (weight-tied, recurrent-depth) transformers can generalize to longer inpu
 We preregistered a test of whether adding an exact Hutchinson estimate of the Hessian trace, λ·tr(H), to the training loss of a looped transformer changes length generalization on binary addition. Models were trained on operands of 1–19 bits and tested on 20–60 bits. This paper reports Stage 1: one penalized and one unpenalized model, with the same seed, initialization and data stream.
 
 <!-- BEGIN:headline -->
-Pending.
+Stage 1 is in progress (finished arms: none).
 <!-- END:headline -->
 
 We also found that PyTorch 2.15.0's native LayerNorm returns incorrect third derivatives. Any explicit Hessian-trace penalty through LayerNorm therefore needs a composite implementation. With one seed per arm, all conclusions are descriptive. The confirmatory, multi-seed design is preregistered and deferred.
@@ -214,11 +214,11 @@ Pending.
 # Appendix C: Curvature details
 
 <!-- BEGIN:curvature_table -->
-Pending.
+Curvature measurements pending.
 <!-- END:curvature_table -->
 
 <!-- BEGIN:loop_table -->
-Pending.
+Loop-count study pending.
 <!-- END:loop_table -->
 
 # AI statement
