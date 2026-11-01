@@ -3,7 +3,7 @@
 import torch
 
 from looped_hessian import curvature, data
-from looped_hessian.model import LoopedGPT, ModelConfig
+from looped_hessian.model import LoopedGPT, ModelConfig, third_order_safe
 from looped_hessian.regularizers import BaselineStep, HutchinsonStep, hutchinson_penalty
 
 
@@ -43,7 +43,9 @@ def test_third_order_gradient_through_looped_model_matches_finite_differences():
     from looped_hessian.regularizers import loss_fn
 
     def penalty():
-        return hutchinson_penalty(loss_fn(model, x, y, loops), params, torch.Generator().manual_seed(3))
+        # Same construction as HutchinsonStep: forward built with composite LayerNorm.
+        with third_order_safe():
+            return hutchinson_penalty(loss_fn(model, x, y, loops), params, torch.Generator().manual_seed(3))
 
     pen = penalty()
     grads = torch.autograd.grad(pen, params)
@@ -65,3 +67,28 @@ def test_hutchinson_step_reports_loss_and_penalty():
     out = HutchinsonStep(lam=1e-3, sub_batch=2, seed=0)(model, *batch)
     assert set(out) >= {"loss", "vhv"}
     assert all(p.grad is not None for p in curvature.trainable_params(model))
+
+
+def test_amortized_penalty_applies_every_k_steps_with_scaled_weight():
+    model, batch = _tiny_model_and_batch()
+    params = curvature.trainable_params(model)
+    BaselineStep()(model, *batch)
+    base = [p.grad.clone() for p in params]
+    model.zero_grad(set_to_none=True)
+    step = HutchinsonStep(lam=1e-3, sub_batch=2, seed=5, every=2)
+    first = step(model, *batch)
+    applied = [p.grad.clone() for p in params]
+    model.zero_grad(set_to_none=True)
+    second = step(model, *batch)
+    # Penalty only on calls 0, 2, 4, ...; skipped calls reproduce the baseline gradient.
+    assert "vhv" in first and "vhv" not in second
+    for b, p in zip(base, params):
+        torch.testing.assert_close(p.grad, b)
+    # On an applied call the extra gradient is every·λ·∇(vᵀHv) with the same probe stream.
+    from looped_hessian.regularizers import loss_fn
+    with third_order_safe():
+        pen = hutchinson_penalty(loss_fn(model, *(t[:2] for t in batch)), params,
+                                 torch.Generator().manual_seed(5))
+    expected = [b + 2e-3 * g for b, g in zip(base, torch.autograd.grad(pen, params))]
+    for e, a in zip(expected, applied):
+        torch.testing.assert_close(a, e)

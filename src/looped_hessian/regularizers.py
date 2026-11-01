@@ -16,6 +16,7 @@ import torch.nn.functional as F
 
 from looped_hessian.data import IGNORE
 from looped_hessian.linalg import dot, hvp_from_grads, rademacher_like, trainable_params
+from looped_hessian.model import third_order_safe
 
 
 def loss_fn(model, x: torch.Tensor, y: torch.Tensor, loops: torch.Tensor) -> torch.Tensor:
@@ -50,14 +51,20 @@ class BaselineStep:
 
 class HutchinsonStep:
     """Objective L + λ · vᵀ H_sub v, where H_sub is the Hessian of the loss on the first
-    `sub_batch` problems of the batch (a quarter of the batch, to fit the third-order graph
-    in 8 GB; preregistration Sec. 4).
+    `sub_batch` problems of the batch.
+
+    Amortization (preregistration addendum 1): the penalty is applied on every `every`-th
+    step with weight `every · λ`, so its expected contribution per step is still λ ∇tr(H)
+    (the same lazy-curvature idea as Sophia's Hessian estimates every k = 10 steps,
+    arXiv:2305.14342). `every = 1` is the plain per-step penalty.
     """
 
-    def __init__(self, lam: float, sub_batch: int, seed: int):
+    def __init__(self, lam: float, sub_batch: int, seed: int, every: int = 1):
         self.lam = lam
         self.sub_batch = sub_batch
         self.seed = seed
+        self.every = every
+        self.calls = 0
         # Probe generator is created lazily on the parameters' device and is separate from
         # the data generator, so the baseline and this arm see identical batches.
         self.gen = None
@@ -69,17 +76,24 @@ class HutchinsonStep:
         # 1) ∇L on the full batch, accumulated into .grad (frees the first graph early).
         loss = loss_fn(model, x, y, loops)
         loss.backward()
-        # 2) λ ∇(vᵀ H_sub v), accumulated into the same .grad buffers.
-        s = self.sub_batch
-        penalty = hutchinson_penalty(loss_fn(model, x[:s], y[:s], loops[:s]), params, self.gen)
-        (self.lam * penalty).backward()
-        return {"loss": loss.item(), "vhv": penalty.item()}
+        out = {"loss": loss.item()}
+        apply = self.calls % self.every == 0
+        self.calls += 1
+        if apply:
+            # 2) every·λ ∇(vᵀ H_sub v), accumulated into the same .grad buffers. The sub-batch
+            #    forward uses composite LayerNorm, the only op whose native third derivative is wrong.
+            s = self.sub_batch
+            with third_order_safe():
+                penalty = hutchinson_penalty(loss_fn(model, x[:s], y[:s], loops[:s]), params, self.gen)
+                (self.every * self.lam * penalty).backward()
+            out["vhv"] = penalty.item()
+        return out
 
 
-def make_step(arm: str, lam: float = 0.0, sub_batch: int = 16, seed: int = 0):
+def make_step(arm: str, lam: float = 0.0, sub_batch: int = 16, seed: int = 0, every: int = 1):
     # Factory used by the training loop; arm names match the preregistration.
     if arm == "baseline":
         return BaselineStep()
     if arm == "hutchinson":
-        return HutchinsonStep(lam=lam, sub_batch=sub_batch, seed=seed)
+        return HutchinsonStep(lam=lam, sub_batch=sub_batch, seed=seed, every=every)
     raise ValueError(f"unknown arm {arm!r}")

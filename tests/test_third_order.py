@@ -13,7 +13,7 @@ import torch
 import torch.nn.functional as F
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
-from looped_hessian.model import LayerNorm
+from looped_hessian.model import LayerNorm, third_order_safe
 
 DT = torch.float64
 
@@ -52,8 +52,9 @@ def _attention(q):
 
 
 def _composite_ln(z, w, b):
-    # Route the test parameters through the module's own forward via functional_call.
-    return torch.func.functional_call(LayerNorm(8).double(), {"weight": w, "bias": b}, (z,))
+    # Route the test parameters through the module's composite path via functional_call.
+    with third_order_safe():
+        return torch.func.functional_call(LayerNorm(8).double(), {"weight": w, "bias": b}, (z,))
 
 
 CASES = {

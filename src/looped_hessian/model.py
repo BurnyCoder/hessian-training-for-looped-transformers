@@ -18,6 +18,7 @@ one backend everywhere keeps numerics identical across training arms.
 """
 
 import math
+from contextlib import contextmanager
 from dataclasses import dataclass
 
 import torch
@@ -38,16 +39,19 @@ class ModelConfig:
 
 
 class LayerNorm(nn.Module):
-    """LayerNorm written with composite ops so that it is correct to any derivative order.
+    """LayerNorm with a switchable composite-op path that is correct to any derivative order.
 
     Same math and parameters as nn.LayerNorm (Ba et al. 2016, arXiv:1607.06450): normalise
     over the last dimension with biased variance, eps = 1e-5, then elementwise affine.
-    Reason for not using nn.LayerNorm: in PyTorch 2.15.0 the third derivative through the
-    native `layer_norm` kernel disagrees with converged finite differences (its double
-    backward is not itself differentiated correctly), which silently corrupts the gradient
-    of the Hutchinson penalty. tests/test_third_order.py reproduces this and checks this
-    replacement.
+    By default the native `F.layer_norm` kernel is used (fast, low memory, and its first and
+    second derivatives agree with finite differences, see tests/test_curvature.py). In
+    PyTorch 2.15.0 its *third* derivative does not (tests/test_third_order.py), which would
+    silently corrupt the gradient of the Hutchinson penalty, so graphs that will be
+    differentiated three times are built inside `third_order_safe()`, which switches every
+    LayerNorm to the composite formula below.
     """
+
+    composite = False  # class-level switch, toggled only by third_order_safe()
 
     def __init__(self, dim: int, eps: float = 1e-5):
         super().__init__()
@@ -56,10 +60,23 @@ class LayerNorm(nn.Module):
         self.bias = nn.Parameter(torch.zeros(dim))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if not LayerNorm.composite:
+            return F.layer_norm(x, (x.shape[-1],), self.weight, self.bias, self.eps)
         mu = x.mean(-1, keepdim=True)
         # Biased (population) variance, matching nn.LayerNorm.
         var = (x - mu).pow(2).mean(-1, keepdim=True)
         return (x - mu) * torch.rsqrt(var + self.eps) * self.weight + self.bias
+
+
+@contextmanager
+def third_order_safe():
+    """Build forward graphs with composite LayerNorm (needed for third-order autograd)."""
+    previous = LayerNorm.composite
+    LayerNorm.composite = True
+    try:
+        yield
+    finally:
+        LayerNorm.composite = previous
 
 
 class CausalSelfAttention(nn.Module):
