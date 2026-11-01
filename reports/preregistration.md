@@ -232,3 +232,24 @@ Scope set by the project owner on 2026-11-01: train exactly two models today. Ev
 - On steps where the penalty is applied, the total gradient norm was 10²–10³. Steps without it had norms of about 1–40.
 - The single-probe ∇(vᵀHv) has very high variance in about 2.4M dimensions. With the preregistered clip at 1.0, the penalty direction therefore dominates the update on those steps.
 - λ and clipping are kept as preregistered. This is flagged as an interpretation caveat: the Stage 2 random-direction control is designed to separate curvature-specific effects from injected gradient noise.
+
+
+### Addendum 2: 2026-11-01 19:58 WEST, before either Stage 1 model was trained
+
+**What happened since Addendum 1.**
+- The baseline run was launched at 19:30 and stopped by me at step ~2,000 of 30,000, before any evaluation.
+- Reason: its periodic in-training tr(H) probe spilled past the 8 GB of VRAM into Windows shared system memory. The step-1000 probe took ~100 s.
+- The caching allocator had reserved 7.3 GB, against a peak usage of 4.46 GB. On Windows (WDDM), allocations beyond VRAM do not fail; they fall back to slow system memory.
+- That run's folder was deleted. Training restarts from scratch with an identical training configuration. Only its training-loss log lines were seen, no accuracy.
+
+**Infrastructure changes (they do not change the training objective or data).**
+
+1. **GPU memory cap.** `torch.cuda.set_per_process_memory_fraction(0.85)`, so the allocator frees its cache and retries instead of spilling. With the cap, a quick evaluation fell from 80 s to 2.8 s.
+2. **In-training tr(H) probe.** Now every 2,000 steps (was "periodically", implemented as 1,000), with 16-problem chunks. It still uses 10 probes on the fixed 128-problem batch.
+3. **Curvature measurement cut down for time.** On this machine one Hessian-vector product through ≤20 loops costs ~0.58 s regardless of chunk size, which points to kernel-launch overhead. 32-problem chunks at K = 20 exceed memory, and 16-problem chunks peak at 4.6 GB. At these costs the preregistered measurement would take about 2.5 h per model. Changes:
+   - measurement batch 512 → **128** problems (same seed and construction; identical for both models);
+   - loop-count study probes 20 → **10**;
+   - loop-count study power iterations 20 → **10**;
+   - the main tr(H) still uses 100 probes;
+   - the dominant eigenvalue still uses 50 power iterations.
+4. **No WSL fallback.** A WSL environment was tried as the preregistered fallback; its PyTorch download timed out, so runs stay on Windows.

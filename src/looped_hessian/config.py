@@ -38,7 +38,7 @@ class TrainConfig:
     loop_jitter: int = 5  # Kuo et al.: K ~ U{n-5, ..., n+5}
     max_train_loops: int = 20  # Kuo et al.: T_max = 20
     log_every: int = 100
-    curvature_every: int = 1000  # in-training 10-probe tr(H) on a fixed 128-problem batch
+    curvature_every: int = 2000  # in-training 10-probe tr(H) on a fixed 128-problem batch (~45 s each)
     curvature_probes: int = 10
     curvature_batch: int = 128
     eval_every: int = 2000  # quick learning-curve evaluation (not the final evaluation)
@@ -57,7 +57,7 @@ class EvalConfig:
 
 @dataclass
 class MeasureConfig:
-    batch: int = 512  # fixed measurement batch from the training distribution
+    batch: int = 128  # fixed measurement batch (addendum 2: 512 -> 128 for time)
     seed: int = 20_000
     probes: int = 100
     power_iters: int = 50
@@ -66,9 +66,9 @@ class MeasureConfig:
     sharpness_rhos: tuple = (0.01, 0.02, 0.05)
     sharpness_draws: int = 10
     loop_ks: tuple = (1, 2, 4, 8, 12, 16, 20)  # loop-count curvature study
-    loop_probes: int = 20
-    loop_power_iters: int = 20
-    chunk_size: int = 32
+    loop_probes: int = 10  # addendum 2: 20 -> 10
+    loop_power_iters: int = 10  # addendum 2: 20 -> 10
+    chunk_size: int = 16  # HVP graphs cost ~0.2 GB per problem at K<=19; 32 spilled past 8 GB
 
 
 @dataclass

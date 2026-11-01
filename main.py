@@ -19,6 +19,7 @@ Example (Stage 1):
 import argparse
 import json
 import os
+import sys
 
 import torch  # noqa: E402
 
@@ -26,9 +27,16 @@ from looped_hessian.config import RunConfig, TrainConfig  # noqa: E402
 from looped_hessian.log import get_logger  # noqa: E402
 
 # TF32 matmuls (fp32 storage), identical for every arm. Deterministic kernels are NOT forced:
-# they made the baseline step 34% slower in our benchmark; runs are seeded but not bitwise
+# they made the baseline step ~25% slower (results/benchmark: 0.25 vs 0.20 s/step); runs are seeded but not bitwise
 # reproducible (https://docs.pytorch.org/docs/stable/notes/randomness.html).
 torch.set_float32_matmul_precision("high")
+# Cap the caching allocator below physical VRAM: on Windows (WDDM) allocations beyond VRAM do not
+# fail but silently fall back to system memory, which made evaluation ~30x slower in our tests.
+# With a cap, the allocator frees cached blocks and retries instead.
+if torch.cuda.is_available():
+    torch.cuda.set_per_process_memory_fraction(float(os.getenv("LH_GPU_MEM_FRACTION", "0.85")))
+# Windows consoles default to cp1252; results text contains symbols such as Δ and ρ.
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
 def make_config(args) -> RunConfig:

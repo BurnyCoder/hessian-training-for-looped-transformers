@@ -128,7 +128,7 @@ def train(cfg: RunConfig, logger) -> dict:
             record = {"step": step, **metrics, "grad_norm": grad_norm, "lr": sched.get_last_lr()[0],
                       "n_max": int(lengths.max()), "elapsed_s": time.time() - t0}
         if step % tc.curvature_every == 0 or step == tc.steps - 1:
-            tr = hutchinson_trace(model, curv_batch, tc.curvature_probes, seed=40_000, chunk_size=32)
+            tr = hutchinson_trace(model, curv_batch, tc.curvature_probes, seed=40_000, chunk_size=16)
             record = (record or {"step": step}) | {"trace_h": tr["trace"], "trace_h_se": tr["se"]}
         if (step % tc.eval_every == 0 and step > 0) or step == tc.steps - 1:
             quick = evaluate_model(model, (5, 10, 15, 19, 20, 30, 40), tc.eval_count, seed_base=50_000,

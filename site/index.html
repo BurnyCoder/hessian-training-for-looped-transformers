@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hessian-Penalized Looped Transformers</title>
+<meta name="description" content="Interactive results: does a Hessian-trace (curvature) penalty change length generalization of looped transformers?">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/3.1.0/plotly.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/15.0.7/marked.min.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --surface: #fcfcfb; --surface-2: #f3f2ef; --ink: #0b0b0b; --ink-2: #52514e; --grid: #e4e3df;
+    --baseline: #2a78d6; --hutchinson: #eb6834; --untrained: #1baf7a; --accent: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface: #1a1a19; --surface-2: #242423; --ink: #f0efec; --ink-2: #c3c2b7; --grid: #3a3a38;
+      --baseline: #3987e5; --hutchinson: #d95926; --untrained: #199e70; --accent: #3987e5;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface: #1a1a19; --surface-2: #242423; --ink: #f0efec; --ink-2: #c3c2b7; --grid: #3a3a38;
+    --baseline: #3987e5; --hutchinson: #d95926; --untrained: #199e70; --accent: #3987e5;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface); color: var(--ink);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  h2 { font-size: 1.15rem; margin: 36px 0 8px; }
+  p, li { color: var(--ink-2); }
+  a { color: var(--accent); }
+  .links a { margin-right: 14px; }
+  .card { background: var(--surface-2); border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+  .card p { color: var(--ink); margin: 0; }
+  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; font-size: 13px; width: 100%; }
+  th, td { border-bottom: 1px solid var(--grid); padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { color: var(--ink-2); font-weight: 600; }
+  code { font-size: 12px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 8px 0; color: var(--ink-2); }
+  select, input[type=range] { font: inherit; }
+  .chart { width: 100%; height: 380px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  details summary { cursor: pointer; color: var(--ink-2); margin: 8px 0; }
+  .muted { color: var(--ink-2); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Hessian-trace regularization for looped transformers</h1>
+  <p>A looped transformer reuses one block of layers K times. We trained two otherwise identical looped transformers to add binary numbers of 1–19 bits and tested them on 20–60 bits. One was trained normally; the other also paid λ·tr(H), the exact Hutchinson estimate of the Hessian trace (loss curvature). Same seed, same initialization, same training problems. Stage 1 compares one seed per arm and is descriptive only.</p>
+  <p class="links">
+    <a href="https://github.com/BurnyCoder/hessian-training-for-looped-transformers">GitHub repository</a>
+    <a href="https://github.com/BurnyCoder/hessian-training-for-looped-transformers/blob/main/reports/preregistration.md">Preregistration</a>
+    <a href="https://github.com/BurnyCoder/hessian-training-for-looped-transformers/blob/main/reports/paper/paper.pdf">Paper (PDF)</a>
+    <a href="https://huggingface.co/BurnyCoder/hessian-looped-transformers">Checkpoints</a>
+  </p>
+
+  <h2>Headline</h2>
+  <div class="card" id="headline">Loading…</div>
+
+  <h2>Accuracy by operand length</h2>
+  <div class="controls">
+    <label>Stopping rule
+      <select id="rule">
+        <option value="oracle">oracle K (best loop count per length, primary)</option>
+        <option value="max_confidence">max-confidence K (label-free)</option>
+        <option value="fixed_n">K = n</option>
+      </select>
+    </label>
+  </div>
+  <div id="acc_len" class="chart"></div>
+  <p class="muted">Dashed line: longest training problem (n = 19). Shaded bands: 95% Wilson intervals (test-set sampling only, not seed variance).</p>
+
+  <h2>Accuracy by loop count</h2>
+  <div class="controls">
+    <label>Operand length n <select id="len_pick"></select></label>
+  </div>
+  <div id="acc_k" class="chart"></div>
+  <p class="muted">Each loop iteration applies the shared block once more. Longer problems need more iterations; the curve shows whether the model keeps its answer stable as it loops.</p>
+
+  <h2>Training</h2>
+  <div class="grid2">
+    <div id="loss" class="chart"></div>
+    <div id="trace" class="chart"></div>
+  </div>
+
+  <h2>Curvature at the end of training</h2>
+  <div class="grid2">
+    <div id="groups" class="chart"></div>
+    <div id="loopstudy" class="chart"></div>
+  </div>
+
+  <h2>Results table</h2>
+  <div class="table-wrap" id="results_table"></div>
+
+  <h2>Output examples</h2>
+  <div class="table-wrap" id="examples_table"></div>
+
+  <details><summary>Per-length accuracies</summary><div class="table-wrap" id="per_length_table"></div></details>
+  <details><summary>Curvature per parameter group</summary><div class="table-wrap" id="curvature_table"></div></details>
+  <details><summary>Loop-count curvature study</summary><div class="table-wrap" id="loop_table"></div></details>
+
+  <p class="muted">All numbers come from <code>results/stage1_summary.json</code>, generated by <code>main.py report</code>. Author: Libor "Burny" Burian.</p>
+</main>
+<script>
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const ARM_LABEL = {baseline: "baseline (plain looped)", hutchinson: "Hutchinson tr(H) penalty", untrained: "untrained (init)"};
+const DASH = {baseline: "solid", hutchinson: "dash", untrained: "dot"};
+const SYMBOL = {baseline: "circle", hutchinson: "square", untrained: "triangle-up"};
+
+function layout(title, xt, yt, extra = {}) {
+  return Object.assign({
+    title: {text: title, font: {size: 14, color: css("--ink")}, x: 0, xanchor: "left"},
+    paper_bgcolor: css("--surface"), plot_bgcolor: css("--surface"),
+    font: {color: css("--ink-2"), size: 12},
+    xaxis: {title: {text: xt}, gridcolor: css("--grid"), zeroline: false},
+    yaxis: {title: {text: yt}, gridcolor: css("--grid"), zeroline: false},
+    legend: {orientation: "h", y: -0.25}, margin: {l: 60, r: 20, t: 40, b: 70},
+    hovermode: "x unified"
+  }, extra);
+}
+const cfg = {displaylogo: false, responsive: true};
+const wilson = (k, n) => { const z = 1.96, p = k / n, d = 1 + z*z/n, c = (p + z*z/(2*n)) / d,
+  h = z * Math.sqrt(p*(1-p)/n + z*z/(4*n*n)) / d; return [Math.max(0, c-h), Math.min(1, c+h)]; };
+
+fetch("data/summary.json").then(r => r.json()).then(S => {
+  const md = s => marked.parse(s || "");
+  document.getElementById("headline").innerHTML = md(S.tables.headline);
+  for (const k of ["results_table", "examples_table", "per_length_table", "curvature_table", "loop_table"])
+    document.getElementById(k).innerHTML = md(S.tables[k]);
+  const lengths = S.id_lengths.concat(S.ood_lengths);
+  const series = Object.assign({}, ...Object.keys(S.arms).map(a => ({[a]: S.arms[a].per_length})),
+                               S.untrained ? {untrained: S.untrained.per_length} : {});
+  const firstArm = Object.values(S.arms)[0];
+  const nPer = firstArm.metrics.ood_oracle.n / S.ood_lengths.length;  // problems per length
+
+  function drawAccLen() {
+    const rule = document.getElementById("rule").value;
+    const traces = [];
+    for (const [arm, pl] of Object.entries(series)) {
+      const acc = lengths.map(n => pl[n][rule].acc);
+      const ks = lengths.map(n => pl[n][rule].k);
+      const ci = acc.map(a => wilson(Math.round(a * nPer), nPer));
+      const col = css("--" + arm);
+      traces.push({x: lengths.concat([...lengths].reverse()), y: ci.map(c => c[1]).concat(ci.map(c => c[0]).reverse()),
+                   fill: "toself", fillcolor: col + "26", line: {width: 0}, hoverinfo: "skip", showlegend: false});
+      traces.push({x: lengths, y: acc, name: ARM_LABEL[arm], mode: "lines+markers", customdata: ks,
+                   line: {color: col, width: 2, dash: DASH[arm]}, marker: {symbol: SYMBOL[arm], size: 8},
+                   hovertemplate: "%{y:.1%} (K=%{customdata})"});
+    }
+    Plotly.react("acc_len", traces, layout("Exact-match accuracy vs. operand length", "n (bits per operand)", "accuracy",
+      {yaxis: {range: [-0.02, 1.02], tickformat: ".0%", gridcolor: css("--grid")},
+       shapes: [{type: "line", x0: 19.5, x1: 19.5, y0: 0, y1: 1, line: {dash: "dash", color: css("--ink-2"), width: 1}}]}), cfg);
+  }
+
+  const pick = document.getElementById("len_pick");
+  for (const n of lengths) pick.add(new Option(n + (n > 19 ? " (OOD)" : ""), n));
+  pick.value = S.ood_lengths[1] || lengths[0];
+  function drawAccK() {
+    const n = pick.value;
+    const traces = Object.entries(series).map(([arm, pl]) => ({
+      x: pl[n].acc_per_k.map((_, i) => i + 1), y: pl[n].acc_per_k, name: ARM_LABEL[arm], mode: "lines+markers",
+      line: {color: css("--" + arm), width: 2, dash: DASH[arm]}, marker: {symbol: SYMBOL[arm], size: 7},
+      hovertemplate: "K=%{x}: %{y:.1%}"}));
+    Plotly.react("acc_k", traces, layout(`Accuracy vs. loop count K at n = ${n}`, "loop count K", "accuracy",
+      {yaxis: {range: [-0.02, 1.02], tickformat: ".0%", gridcolor: css("--grid")},
+       shapes: [{type: "line", x0: Number(n), x1: Number(n), y0: 0, y1: 1, line: {dash: "dot", color: css("--ink-2"), width: 1}}]}), cfg);
+  }
+
+  function drawTraining() {
+    const loss = [], tr = [];
+    for (const [arm, a] of Object.entries(S.arms)) {
+      const h = a.history || [];
+      const L = h.filter(r => "loss" in r), T = h.filter(r => "trace_h" in r);
+      loss.push({x: L.map(r => r.step), y: L.map(r => r.loss), name: ARM_LABEL[arm], mode: "lines",
+                 line: {color: css("--" + arm), width: 2, dash: DASH[arm]}});
+      tr.push({x: T.map(r => r.step), y: T.map(r => r.trace_h), name: ARM_LABEL[arm], mode: "lines+markers",
+               error_y: {type: "data", array: T.map(r => r.trace_h_se), visible: true, thickness: 1},
+               line: {color: css("--" + arm), width: 2, dash: DASH[arm]}, marker: {symbol: SYMBOL[arm], size: 7}});
+    }
+    Plotly.react("loss", loss, layout("Training loss (log scale)", "step", "cross-entropy",
+      {yaxis: {type: "log", gridcolor: css("--grid")}}), cfg);
+    Plotly.react("trace", tr, layout("tr(H) during training (10 probes, ±1 SE)", "step", "tr(H)"), cfg);
+  }
+
+  function drawCurvature() {
+    const arms = Object.keys(S.arms).filter(a => S.arms[a].curvature);
+    if (!arms.length) return;
+    const groups = Object.keys(S.arms[arms[0]].curvature.trace.groups);
+    Plotly.react("groups", arms.map(arm => ({
+      type: "bar", x: groups, y: groups.map(g => S.arms[arm].curvature.trace.groups[g].trace), name: ARM_LABEL[arm],
+      error_y: {type: "data", array: groups.map(g => S.arms[arm].curvature.trace.groups[g].se)},
+      marker: {color: css("--" + arm), pattern: {shape: arm === "hutchinson" ? "/" : ""}}})),
+      layout("Diagonal-block Hessian traces (±1 SE)", "parameter group", "tr(H_group)", {barmode: "group", bargap: 0.25}), cfg);
+    Plotly.react("loopstudy", arms.map(arm => {
+      const rows = S.arms[arm].curvature.loop_study;
+      return {x: rows.map(r => r.k), y: rows.map(r => r.trace.trace), name: ARM_LABEL[arm], mode: "lines+markers",
+              error_y: {type: "data", array: rows.map(r => r.trace.se)},
+              line: {color: css("--" + arm), width: 2, dash: DASH[arm]}, marker: {symbol: SYMBOL[arm], size: 8}};
+    }), layout("tr(H) when every problem is read out at loop K", "loop count K", "tr(H)"), cfg);
+  }
+
+  document.getElementById("rule").addEventListener("change", drawAccLen);
+  pick.addEventListener("change", drawAccK);
+  const drawAll = () => { drawAccLen(); drawAccK(); drawTraining(); drawCurvature(); };
+  drawAll();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawAll);
+}).catch(e => { document.getElementById("headline").textContent = "Could not load data/summary.json: " + e; });
+</script>
+</body>
+</html>

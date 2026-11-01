@@ -24,3 +24,4 @@ Thumbs.db
 .idea/
 results/smoke/
 checkpoints/
+.claude/
