@@ -137,6 +137,8 @@ def results_table(s: dict) -> str:
                     f"| {_pct(m['ood_max_confidence'])} | {_pct(m['ood_fixed_n'])} | {curv} | {hours} |")
     note = ("\n\nAccuracies: exact match over all n+1 sum bits and EOS, pooled over lengths (1000 problems per "
             "length), with 95% Wilson intervals that cover test-set sampling only, not seed-to-seed variance. "
+            "The oracle K is chosen on the same test problems, so oracle accuracies are optimistic and their "
+            "intervals too narrow; the label-free max-confidence column has no such selection. "
             "Curvature metrics: fixed 512-problem training-distribution batch, read out at K = n.")
     return head + "\n".join(rows) + note
 
