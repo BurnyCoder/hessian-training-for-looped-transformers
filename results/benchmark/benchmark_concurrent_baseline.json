@@ -1,0 +1,8 @@
+{
+  "baseline": {
+    "arm": "baseline",
+    "seconds_per_step": 0.6957623219490051,
+    "steps_timed": 100,
+    "peak_memory_gb": 4.4571136
+  }
+}

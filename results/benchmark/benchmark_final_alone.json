@@ -1,0 +1,14 @@
+{
+  "baseline": {
+    "arm": "baseline",
+    "seconds_per_step": 0.20089750736951828,
+    "steps_timed": 64,
+    "peak_memory_gb": 4.4571136
+  },
+  "hutchinson": {
+    "arm": "hutchinson",
+    "seconds_per_step": 0.44618970900774,
+    "steps_timed": 64,
+    "peak_memory_gb": 4.4571136
+  }
+}
