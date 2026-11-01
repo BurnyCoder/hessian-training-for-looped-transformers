@@ -196,4 +196,39 @@ Scope set by the project owner on 2026-11-01: train exactly two models today. Ev
 - **Stopping rule:** primary oracle-K metric plus label-free secondary metrics.
 
 ## Addenda
-(none yet)
+
+### Addendum 1: 2026-11-01 19:30 CET, before either Stage 1 model was trained
+
+**What has been run so far.** Only throughput benchmarks and a 60-step smoke test.
+- Benchmarks: `results/benchmark/*.json`, 16–200 timed steps at the full length range. No model is kept.
+- Smoke test: `main.py smoke`. It checks plumbing only; its models reach 0% accuracy and are not reported.
+- No Stage 1 model has been trained or evaluated.
+
+**Deviations from Section 4, all forced by the 8 GB GPU**
+
+1. **Hutchinson sub-batch: 16 → 4 problems.**
+   - At 16, the third-order graph needed 10.05 GB, which is more than the GPU's 8 GB. Windows spilled it into system memory, giving 15.6 s/step (`benchmark_hutchinson_only.json`).
+   - At 4, peak memory is 4.46 GB (`benchmark_hutchinson_sub4.json`).
+2. **Penalty schedule: applied every k = 8 steps with weight k·λ = 4×10⁻⁴, instead of every step with λ.**
+   - The expected penalty gradient per step is still λ·∇tr(H). This follows the lazy-curvature practice of Sophia ([arXiv:2305.14342](https://arxiv.org/abs/2305.14342)), which estimates curvature every k = 10 steps.
+   - Applying it every step costs 2.15 s/step (`benchmark_hutchinson_every1_sub4.json`), so 30k steps would take about 18 h. The amortized arm costs 0.446 s/step (`benchmark_final_alone.json`).
+3. **Deterministic kernels are not forced.**
+   - `torch.use_deterministic_algorithms(True)` slowed the baseline from about 0.20 to 0.25 s/step.
+   - Runs remain seeded, with identical data streams and initializations across arms, but are not bitwise reproducible.
+4. **The two arms run sequentially, not concurrently.**
+   - Sharing the GPU gave no throughput gain: the baseline slowed from 0.20 to 0.70 s/step when run alongside the Hutchinson arm (`benchmark_concurrent_*.json`).
+   - The 7 h rule is therefore applied to the sequential total.
+5. **LayerNorm implementation.**
+   - In torch 2.15.0, the native `layer_norm` third derivative disagrees with converged finite differences (`tests/test_third_order.py`).
+   - The penalty's sub-batch forward pass therefore uses a mathematically identical composite LayerNorm.
+   - All other forward passes use the native kernel. Its first and second derivatives agree with finite differences (`tests/test_curvature.py`).
+
+**Step budget, by the preregistered rule.**
+- Projected total: (0.201 + 0.446) s × S, using full-length timing, so this is an upper bound.
+- S = 50k → 9.0 h, over the 7 h limit. S = 30k → 5.4 h, within it.
+- **S = 30,000.**
+
+**Observation recorded before training (smoke test, not a generalization result).**
+- On steps where the penalty is applied, the total gradient norm was 10²–10³. Steps without it had norms of about 1–40.
+- The single-probe ∇(vᵀHv) has very high variance in about 2.4M dimensions. With the preregistered clip at 1.0, the penalty direction therefore dominates the update on those steps.
+- λ and clipping are kept as preregistered. This is flagged as an interpretation caveat: the Stage 2 random-direction control is designed to separate curvature-specific effects from injected gradient noise.

@@ -1,0 +1,8 @@
+{
+  "hutchinson": {
+    "arm": "hutchinson",
+    "seconds_per_step": 0.809534702450037,
+    "steps_timed": 64,
+    "peak_memory_gb": 4.4571136
+  }
+}
