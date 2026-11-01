@@ -113,7 +113,7 @@ def _pct(m: dict) -> str:
 def results_table(s: dict) -> str:
     head = ("| Model | ID exact match % (n=1–19) | **OOD exact match %, oracle K** (primary) | OOD %, max-confidence K "
             "| OOD %, K=n | tr(H) ± SE | dominant eigenvalue | Fisher trace ± SE | adaptive sharpness ρ=0.01 / 0.02 / 0.05 "
-            "| weight norm | loss on measurement batch | training time |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n")
+            "| weight norm | loss on measurement batch | training wall-clock (incl. periodic probes) |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n")
     rows = []
     if "chance" in s:
         rows.append(f"| chance (guess n+1 bits) | {100 * s['chance']['id']:.2g} | {100 * s['chance']['ood']:.2g} "
@@ -130,7 +130,9 @@ def results_table(s: dict) -> str:
                     f"| {c['weight_norms']['total']:.4g} | {c['loss']:.3g}")
         else:
             curv = "– | – | – | – | – | –"
-        hours = f"{t['train_seconds'] / 3600:.2f} h" if t else "–"
+        # Wall-clock for both arms (the baseline predates the step_seconds field), flagged if diverged.
+        hours = (f"{t['train_seconds'] / 3600:.2f} h"
+                 + ("" if t.get("status", "completed") == "completed" else f" ({t['status'].upper()})")) if t else "–"
         rows.append(f"| {plots.STYLE[arm]['label']} | {_pct(m['id_oracle'])} | **{_pct(m['ood_oracle'])}** "
                     f"| {_pct(m['ood_max_confidence'])} | {_pct(m['ood_fixed_n'])} | {curv} | {hours} |")
     note = ("\n\nAccuracies: exact match over all n+1 sum bits and EOS, pooled over lengths (1000 problems per "

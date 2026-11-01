@@ -108,8 +108,10 @@ def train(cfg: RunConfig, logger) -> dict:
     history_path = os.path.join(cfg.run_dir, "history.jsonl")
     history = open(history_path, "w", encoding="utf-8")
     t0 = time.time()
+    step_seconds = 0.0  # time inside training steps only (excludes periodic probes and evals)
     status = "completed"
     for step in range(tc.steps):
+        t_step = time.time()
         lengths = data.sample_lengths(step, tc.steps, tc.max_train_len, tc.batch_size, data_gen)
         x, y = data.make_batch(lengths, data_gen)
         loops = data.sample_loop_counts(lengths, data_gen, tc.loop_jitter, tc.max_train_loops)
@@ -121,12 +123,20 @@ def train(cfg: RunConfig, logger) -> dict:
             status = "diverged"
             break
         grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), tc.grad_clip).item()
+        if not math.isfinite(grad_norm):
+            # A finite penalty value can still have non-finite third-order gradients; never step on them.
+            logger.error(f"non-finite gradient norm at step {step}: {metrics}")
+            status = "diverged"
+            break
         opt.step()
         sched.step()
+        step_seconds += time.time() - t_step
         record = None
         if step % tc.log_every == 0 or step == tc.steps - 1:
             record = {"step": step, **metrics, "grad_norm": grad_norm, "lr": sched.get_last_lr()[0],
-                      "n_max": int(lengths.max()), "elapsed_s": time.time() - t0}
+                      "n_max": int(lengths.max()),
+                      "curriculum_max": data.curriculum_max_len(step, tc.steps, tc.max_train_len),
+                      "elapsed_s": time.time() - t0}
         if step % tc.curvature_every == 0 or step == tc.steps - 1:
             tr = hutchinson_trace(model, curv_batch, tc.curvature_probes, seed=40_000, chunk_size=16)
             record = (record or {"step": step}) | {"trace_h": tr["trace"], "trace_h_se": tr["se"]}
@@ -143,6 +153,7 @@ def train(cfg: RunConfig, logger) -> dict:
     train_seconds = time.time() - t0
     save_checkpoint(model, cfg, "final.pt")
     summary = {"name": cfg.name, "status": status, "steps_done": step + 1, "train_seconds": train_seconds,
+               "step_seconds": step_seconds,
                "n_params": n_params, "peak_memory_gb": (torch.cuda.max_memory_allocated() / 1e9
                                                         if torch.cuda.is_available() else None)}
     with open(os.path.join(cfg.run_dir, "train_summary.json"), "w") as f:
