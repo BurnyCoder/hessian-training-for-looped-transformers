@@ -197,7 +197,7 @@ Scope set by the project owner on 2026-11-01: train exactly two models today. Ev
 
 ## Addenda
 
-### Addendum 1: 2026-11-01 19:30 CET, before either Stage 1 model was trained
+### Addendum 1: 2026-11-01 19:30 (UTC+1; commit 4b3fb06), before either Stage 1 model was trained
 
 **What has been run so far.** Only throughput benchmarks and a 60-step smoke test.
 - Benchmarks: `results/benchmark/*.json`, 16–200 timed steps at the full length range. No model is kept.
@@ -234,7 +234,7 @@ Scope set by the project owner on 2026-11-01: train exactly two models today. Ev
 - λ and clipping are kept as preregistered. This is flagged as an interpretation caveat: the Stage 2 random-direction control is designed to separate curvature-specific effects from injected gradient noise.
 
 
-### Addendum 2: 2026-11-01 19:58 WEST, before either Stage 1 model was trained
+### Addendum 2: 2026-11-01 19:51 (UTC+1; commit 65d607a), before either Stage 1 model was trained
 
 **What happened since Addendum 1.**
 - The baseline run was launched at 19:30 and stopped by me at step ~2,000 of 30,000, before any evaluation.

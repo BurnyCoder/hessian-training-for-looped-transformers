@@ -15,7 +15,7 @@ An old idea says flat solutions tend to work better on new data. Measuring and p
 **What we can and cannot conclude.** With only one model of each kind, we can describe what happened. We cannot say it would happen again with different random seeds: looped models are known to vary a lot from seed to seed. The preregistered verdict is in the headline below.
 
 <!-- BEGIN:headline -->
-Pending.
+Stage 1 is in progress (finished arms: none).
 <!-- END:headline -->
 
 ## Key terms

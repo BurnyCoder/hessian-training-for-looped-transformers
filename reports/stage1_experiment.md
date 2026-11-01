@@ -6,7 +6,7 @@ All numbers on this page are injected by `uv run python main.py report` from `re
 
 ## Headline
 <!-- BEGIN:headline -->
-Pending.
+Stage 1 is in progress (finished arms: none).
 <!-- END:headline -->
 
 ## What was tested and why
@@ -60,7 +60,7 @@ Pending.
 ![per-group traces](figures/curvature_groups.png)
 
 <!-- BEGIN:curvature_table -->
-Pending.
+Curvature measurements pending.
 <!-- END:curvature_table -->
 
 ### Loop-count curvature study
@@ -68,7 +68,7 @@ Pending.
 ![loop curvature](figures/loop_curvature.png)
 
 <!-- BEGIN:loop_table -->
-Pending.
+Loop-count study pending.
 <!-- END:loop_table -->
 
 ### Output examples (OOD lengths, oracle loop count)

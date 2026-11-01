@@ -30,11 +30,6 @@ from looped_hessian.log import get_logger  # noqa: E402
 # they made the baseline step ~25% slower (results/benchmark: 0.25 vs 0.20 s/step); runs are seeded but not bitwise
 # reproducible (https://docs.pytorch.org/docs/stable/notes/randomness.html).
 torch.set_float32_matmul_precision("high")
-# Cap the caching allocator below physical VRAM: on Windows (WDDM) allocations beyond VRAM do not
-# fail but silently fall back to system memory, which made evaluation ~30x slower in our tests.
-# With a cap, the allocator frees cached blocks and retries instead.
-if torch.cuda.is_available():
-    torch.cuda.set_per_process_memory_fraction(float(os.getenv("LH_GPU_MEM_FRACTION", "0.85")))
 # Windows consoles default to cp1252; results text contains symbols such as Δ and ρ.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -132,6 +127,12 @@ def main():
     parser.add_argument("--bench-steps", type=int, default=200)
     parser.add_argument("--tag", default="single")
     args = parser.parse_args()
+    if args.phase not in ("report", "publish") and torch.cuda.is_available():
+        # Cap the caching allocator below physical VRAM: on Windows (WDDM) allocations beyond VRAM do
+        # not fail but silently fall back to system memory, which made evaluation ~30x slower in our
+        # tests. With a cap, the allocator frees cached blocks and retries instead. Report/publish
+        # phases never touch the GPU, so they do not create a CUDA context next to a training run.
+        torch.cuda.set_per_process_memory_fraction(float(os.getenv("LH_GPU_MEM_FRACTION", "0.85")))
     if args.phase == "benchmark":
         return phase_benchmark(args)
     if args.phase == "smoke":
