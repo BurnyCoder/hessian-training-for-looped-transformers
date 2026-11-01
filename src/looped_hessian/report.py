@@ -15,6 +15,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 
 from looped_hessian import plots
 from looped_hessian.config import EvalConfig, TrainConfig
@@ -282,6 +283,26 @@ def _strip_private(s: dict) -> dict:
     return clean(s)
 
 
+def build_pdf(md_path: str = "reports/paper/paper.md") -> bool:
+    """Render the paper with pandoc + XeLaTeX (https://pandoc.org/MANUAL.html#creating-a-pdf).
+
+    Cambria / Consolas cover the Greek letters and math symbols used in the text on Windows.
+    Returns False (and leaves any old PDF) if pandoc or a TeX engine is unavailable.
+    """
+    if shutil.which("pandoc") is None:
+        print("pandoc not found; skipping PDF")
+        return False
+    folder, name = os.path.split(md_path)
+    cmd = ["pandoc", name, "-o", name.replace(".md", ".pdf"), "--pdf-engine=xelatex",
+           "-V", "geometry:margin=2.2cm", "-V", "mainfont=Cambria", "-V", "monofont=Consolas",
+           "-V", "mathfont=Cambria Math", "-V", "colorlinks=true", "-V", "fontsize=10pt",
+           "--resource-path=.:.."]
+    res = subprocess.run(cmd, cwd=folder, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if res.returncode != 0:
+        print("PDF build failed:", res.stderr[-2000:])
+    return res.returncode == 0
+
+
 def build_report(results_dir: str = "results", prefix: str = "stage1_", write_docs: bool = True) -> dict:
     s = summarize(results_dir, prefix)
     runs = {arm: load_run(os.path.join(results_dir, prefix + arm)) for arm in s["arms"]}
@@ -306,6 +327,7 @@ def build_report(results_dir: str = "results", prefix: str = "stage1_", write_do
         for doc in DOCS:
             for key, content in blocks.items():
                 inject(doc, key, content)
+        build_pdf()
         # The static site reads the same summary and figures.
         if os.path.isdir("site"):
             os.makedirs("site/data", exist_ok=True)
