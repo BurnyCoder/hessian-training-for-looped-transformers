@@ -53,12 +53,12 @@
 <body>
 <main>
   <h1>Hessian-trace regularization for looped transformers</h1>
-  <p>A looped transformer reuses one block of layers K times. We trained two otherwise identical looped transformers to add binary numbers of 1–19 bits and tested them on 20–60 bits. One was trained normally; the other also paid λ·tr(H), the exact Hutchinson estimate of the Hessian trace (loss curvature). Same seed, same initialization, same training problems. Stage 1 compares one seed per arm and is descriptive only.</p>
+  <p>A looped transformer reuses one block of layers K times. Stage 1 trains two otherwise identical looped transformers to add binary numbers of 1–19 bits and tests them on 20, 25, …, 60 bits. One is trained normally; the other also pays λ·tr(H), the Hessian trace (loss curvature), estimated without bias by Hutchinson's estimator with exact Hessian-vector products. Same seed, same initialization, same training problems. Stage 1 compares one seed per arm and is descriptive only.</p>
   <p class="links">
     <a href="https://github.com/BurnyCoder/hessian-training-for-looped-transformers">GitHub repository</a>
     <a href="https://github.com/BurnyCoder/hessian-training-for-looped-transformers/blob/main/reports/preregistration.md">Preregistration</a>
     <a href="https://github.com/BurnyCoder/hessian-training-for-looped-transformers/blob/main/reports/paper/paper.pdf">Paper (PDF)</a>
-    <a href="https://huggingface.co/BurnyCoder/hessian-looped-transformers">Checkpoints</a>
+    <a href="https://huggingface.co/BurnyCoder/hessian-looped-transformers">Checkpoints (uploaded after Stage 1 finishes)</a>
   </p>
 
   <h2>Headline</h2>
@@ -129,11 +129,13 @@ const cfg = {displaylogo: false, responsive: true};
 const wilson = (k, n) => { const z = 1.96, p = k / n, d = 1 + z*z/n, c = (p + z*z/(2*n)) / d,
   h = z * Math.sqrt(p*(1-p)/n + z*z/(4*n*n)) / d; return [Math.max(0, c-h), Math.min(1, c+h)]; };
 
-fetch("data/summary.json").then(r => r.json()).then(S => {
+// A missing summary means `main.py report` has not been run and committed for finished runs yet.
+fetch("data/summary.json").then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(S => {
   const md = s => marked.parse(s || "");
   document.getElementById("headline").innerHTML = md(S.tables.headline);
   for (const k of ["results_table", "examples_table", "per_length_table", "curvature_table", "loop_table"])
     document.getElementById(k).innerHTML = md(S.tables[k]);
+  if (!Object.keys(S.arms).length) return;  // no finished arm yet: only the "in progress" headline
   const lengths = S.id_lengths.concat(S.ood_lengths);
   const series = Object.assign({}, ...Object.keys(S.arms).map(a => ({[a]: S.arms[a].per_length})),
                                S.untrained ? {untrained: S.untrained.per_length} : {});
@@ -211,7 +213,8 @@ fetch("data/summary.json").then(r => r.json()).then(S => {
   const drawAll = () => { drawAccLen(); drawAccK(); drawTraining(); drawCurvature(); };
   drawAll();
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawAll);
-}).catch(e => { document.getElementById("headline").textContent = "Could not load data/summary.json: " + e; });
+}).catch(e => { document.getElementById("headline").textContent =
+  "No results published yet (Stage 1 is in progress; data/summary.json: " + e.message + ")."; });
 </script>
 </body>
 </html>

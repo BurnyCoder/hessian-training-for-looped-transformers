@@ -1,11 +1,15 @@
 """Binary-addition task with length generalization.
 
-Local: generates (input, label) token tensors for a + b in the full-output-prediction
-(FOP) format of Fan et al. 2024 ("Looped Transformers for Length Generalization",
-arXiv:2409.15647, Sec. 2.2 and 6.1.1): the input is `a + b >` followed by n+2
-placeholder tokens; the label at each placeholder is one bit of the (n+1)-bit sum,
+Local: generates (input, label) token tensors for a + b in a variant of the
+full-output-prediction (FOP) format of Fan et al. 2024 ("Looped Transformers for Length
+Generalization", arXiv:2409.15647, Sec. 2.2 and 6.1.1): the input is `a + b >` followed by
+n+2 placeholder tokens; the label at each placeholder is one bit of the (n+1)-bit sum,
 most significant bit first (Fan et al. explicitly do not reverse the output), then EOS.
-Every non-answer position is ignored by the loss, and there is no next-token shift.
+Every non-answer position is ignored by the loss. Difference from Fan et al.'s code
+(github.com/UW-Madison-Lee-Lab/looped-tf, src/generate_training_data.py): they write the
+sum bits starting at the `>` position (a one-position shift) and supervise every trailing
+EOS position up to the padded width; here the sum starts at the first placeholder and only
+the n+1 sum bits plus one EOS are supervised.
 
 Global: the training loop samples lengths through `curriculum_max_len`, loop counts
 through `sample_loop_counts` (the randomized-loop schedule of Kuo et al. 2026,

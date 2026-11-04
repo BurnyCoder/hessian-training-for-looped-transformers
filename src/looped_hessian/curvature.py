@@ -13,12 +13,15 @@ Metrics (preregistration Sec. 3):
   arXiv:1912.07145, github.com/amirgholami/PyHessian, MIT); returns the eigenvalue of
   largest magnitude.
 - `fisher_trace`: trace of the Fisher = Gauss-Newton matrix for softmax cross-entropy,
-  tr(G) = N · E||∇L̂||² where L̂ uses labels sampled from the model (the Bartlett identity
-  used by Liu et al. 2023, arXiv:2210.14199, and Sophia's GNB estimator, arXiv:2305.14342).
-  Cross terms vanish because each sampled-label score has zero mean under the model.
+  tr(G) = N · E||∇L̂||² where L̂ uses labels sampled from the model and N counts the sampled
+  labels (answer tokens): the batched Gauss-Newton-Bartlett estimator of Sophia
+  (arXiv:2305.14342, Alg. 2); Liu et al. 2023 (arXiv:2210.14199, App. B.1) use the
+  per-example Bartlett form. Cross terms vanish because each sampled-label score has zero
+  mean under the model.
 - `adaptive_sharpness`: average-case adaptive sharpness E_ε[L(θ + ε⊙|θ|)] − L(θ),
-  ε ~ N(0, ρ²I) (Andriushchenko et al. 2023, arXiv:2302.07011), which is invariant to
-  per-parameter rescaling, unlike tr(H) (Dinh et al. 2017, arXiv:1703.04933).
+  ε ~ N(0, ρ²I) (Andriushchenko et al. 2023, arXiv:2302.07011, Eq. 1 with c = |θ|), which is
+  invariant to function-preserving multiplicative reparametrizations f(θ⊙c) = f(θ), unlike
+  tr(H) (Dinh et al. 2017, arXiv:1703.04933).
 - `weight_norms`: per-group L2 norms, to detect tr(H) reductions bought by norm growth.
 """
 

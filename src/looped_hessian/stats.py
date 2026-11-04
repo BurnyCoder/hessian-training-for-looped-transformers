@@ -14,7 +14,9 @@ import math
 from statsmodels.stats.contingency_tables import mcnemar
 from statsmodels.stats.proportion import proportion_confint
 
-# Kuo et al. 2026 (arXiv:2606.29983), randomized K = n ± 5 on addition: OOD 30.9 ± 5.9 (points).
+# Kuo et al. 2026 (arXiv:2606.29983, Table 1), randomized K = n ± 5 on addition: OOD 30.9, SD 5.9
+# points across 32 runs. Their OOD metric uses a per-example oracle K, ours a per-length one, so the
+# SD is an approximate reference for seed variance, not a like-for-like number.
 KUO_SEED_SD = 5.9
 # Preregistered threshold: |Δ| > 2 · sqrt(2) · SD for a "suggestive" single-seed difference.
 SUGGESTIVE_THRESHOLD = 2 * math.sqrt(2) * KUO_SEED_SD

@@ -37,7 +37,7 @@ tags:
 
 Stage 1 checkpoints of the preregistered experiment in [{GITHUB_URL}]({GITHUB_URL}): a weight-tied
 3-layer GPT-2 block (d=256, 8 heads, no positional embeddings, input injection) looped K times,
-trained on binary addition with operands of 1–19 bits and tested on 20–60 bits. One model is trained with
+trained on binary addition with operands of 1–19 bits and tested on 20, 25, …, 60 bits. One model is trained with
 plain cross-entropy (`stage1_baseline`), one with cross-entropy + λ·tr(H) estimated by Hutchinson's
 estimator (`stage1_hutchinson`). Same seed, data stream and initialization.
 

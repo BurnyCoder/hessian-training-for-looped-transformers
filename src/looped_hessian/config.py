@@ -25,7 +25,7 @@ class TrainConfig:
     arm: str = "baseline"  # "baseline" or "hutchinson" (Stage 1 arms)
     steps: int = 30_000  # set by the preregistered throughput rule (addendum 1)
     batch_size: int = 64  # Fan et al. 2024 / Kuo et al. 2026
-    lr: float = 1e-4  # Fan et al. / Kuo et al.: AdamW 1e-4, cosine decay to 0
+    lr: float = 1e-4  # AdamW 1e-4 (Fan et al. / Kuo et al.), cosine decay to 0 over training (Kuo et al.)
     weight_decay: float = 0.01  # torch.optim.AdamW default
     beta1: float = 0.9
     beta2: float = 0.999

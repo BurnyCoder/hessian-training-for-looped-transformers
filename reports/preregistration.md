@@ -253,3 +253,26 @@ Scope set by the project owner on 2026-11-01: train exactly two models today. Ev
    - the main tr(H) still uses 100 probes;
    - the dominant eigenvalue still uses 50 power iterations.
 4. **No WSL fallback.** A WSL environment was tried as the preregistered fallback; its PyTorch download timed out, so runs stay on Windows.
+
+
+### Addendum 3: 2026-11-04 01:43 (UTC+1), fact-check before any Stage 1 evaluation
+
+**State when written.** No Stage 1 model has been evaluated and no curvature has been measured. The only Stage 1 output is the training log of the restarted baseline run (Addendum 2). It ends at step 6,000 of 30,000 (2026-11-01 20:03), including its in-training quick accuracy checks, and is not committed.
+
+**Scope.** An independent fact-check of the text above against its cited sources. Nothing here changes the training objective, data, model, metrics, thresholds or analysis plan. It only corrects how they relate to the sources.
+
+1. **Task format (Sec. 3, "Data").** The implemented format is a *variant* of Fan et al.'s full-output prediction. Fan et al.'s paper (Sec. 2.2) and code ([`src/generate_training_data.py`](https://github.com/UW-Madison-Lee-Lab/looped-tf)) put the first sum bit at the `>` position, a one-position shift, and supervise every trailing EOS position. Here the sum starts at the first placeholder, and only the n+1 sum bits plus one EOS are supervised. "Fan's full-output prediction: there is no next-token shift" is therefore inaccurate as a description of Fan et al.
+2. **Primary metric (Sec. 3, "Metrics").** The implemented oracle picks one loop count per length from K = 1…n+5. [Kuo et al.](https://arxiv.org/abs/2606.29983)'s oracle (their Sec. 3.3) picks the best K *per example* from K = 1…n+2. The metric is therefore a per-length variant, not "Kuo et al.'s metric", and our numbers are not directly comparable with their published ones.
+3. **Seed variance (Sec. 1 and Sec. 4).** "About 6–10 accuracy points ... against under 1 point for non-looped models" mixes two measures from Kuo et al.:
+   - the across-run SD of mean OOD accuracy: 5.9 (K = n±5), 7.4 (K = 20) and 9.9 (K = n) points, over 32 runs each (Table 1, looped models only);
+   - the per-length across-run SD: 8.7 (K = 20) and 12.2 (K = n) points for looped models vs 0.9 and 0.5 points for 3- and 60-layer non-looped transformers (Sec. 4.1).
+   - Kuo et al. describe the runs as having "similar", not identical, in-distribution accuracy.
+   - The σ ≈ 5.9 used for the Stage 1 reading rule is Table 1's K = n±5 value, measured with their per-example oracle. The unchanged 16.7-point threshold is therefore an approximate reference.
+4. **Learning-rate schedule (Sec. 3, "Optimization").** Cosine decay to 0 over the whole run matches Kuo et al. (App. A). Fan et al. keep the learning rate constant until the curriculum reaches the maximum length and decay it only afterwards (App. F).
+5. **Fused attention kernels (Sec. 3).** [FlashBoB](https://arxiv.org/abs/2609.24089) concerns the FlashAttention algorithm in general. The direct evidence for PyTorch is that its flash, memory-efficient and cuDNN SDPA backends register no derivative for their backward ops (`tools/autograd/derivatives.yaml` in torch 2.15.0). On this machine, double backward through each of them raises "derivative for aten::_scaled_dot_product_*_backward is not implemented", while the math backend works.
+6. **NSO's evidence base (Sec. 2).** "The only tr(H) regularizer we found with transformer/LM results" is too broad:
+   - SEHT, cited in the same section, has language-model results for an LSTM on WikiText-2;
+   - [fSGLD](https://arxiv.org/abs/2510.02174) targets an objective containing (σ²/2)·tr(H) and reports ViT results.
+   - NSO is the only Hessian-trace regularizer we found with *transformer language-model* results (GPT-2 chain-of-thought fine-tuning; a CLIP text encoder).
+7. **Fisher trace (Sec. 3, "Metrics").** The implemented batched sampled-label estimator, N·E‖∇L̂‖², is the Gauss–Newton–Bartlett estimator of [Sophia](https://arxiv.org/abs/2305.14342) (Alg. 2). Liu et al. 2023 (App. B.1) use a per-example form of the same Bartlett identity.
+8. **Liu et al. 2023 (Sec. 1).** "Lower tr(H) predicts better downstream accuracy" is a correlation, shown on language models trained on synthetic PCFG-, HMM- and OPT-generated data.

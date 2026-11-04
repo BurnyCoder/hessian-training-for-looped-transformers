@@ -1,7 +1,7 @@
 [project]
 name = "looped-hessian"
 version = "0.1.0"
-description = "Hessian-trace regularization (exact Hutchinson penalty and NSO) for looped transformers: does penalizing curvature improve length generalization?"
+description = "Hessian-trace regularization (exact Hutchinson penalty; NSO preregistered for Stage 2) for looped transformers: does penalizing curvature improve length generalization?"
 readme = "README.md"
 authors = [
     { name = "Libor \"Burny\" Burian" }
@@ -22,16 +22,14 @@ dependencies = [
 [dependency-groups]
 dev = ["pytest>=8.3"]
 
-[project.scripts]
-looped-hessian = "looped_hessian.cli:main"
-
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
 
 # PyTorch CUDA wheels come from the official PyTorch index, as documented in
-# https://docs.astral.sh/uv/guides/integration/pytorch/ . cu132 is the index that
-# ships torch 2.15.0 Windows wheels with sm_120 (RTX 50xx / Blackwell) kernels.
+# https://docs.astral.sh/uv/guides/integration/pytorch/ . torch 2.15.0 Windows CUDA wheels are
+# published on the cu132 and cu134 indexes; we use cu132, whose build includes sm_120
+# (RTX 50xx / Blackwell) kernels (check with torch.cuda.get_arch_list()).
 [[tool.uv.index]]
 name = "pytorch-cu132"
 url = "https://download.pytorch.org/whl/cu132"
