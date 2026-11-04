@@ -1,11 +1,12 @@
 """Curvature measurement phase: every preregistered sharpness metric for one checkpoint.
 
-Local: all metrics use the same fixed 512-problem batch from the training distribution,
+Local: all metrics use the same fixed measurement batch from the training distribution
+(`MeasureConfig.batch`, 128 problems after preregistration addendum 2; 512 originally),
 read out at K = n, with fixed probe seeds, so different models are measured identically
 (preregistration Sec. 3). The loop-count study re-measures tr(H) and the dominant
 eigenvalue with every problem read out at a fixed K, to see how curvature scales with
-looping (Gong et al. 2025, arXiv:2510.10089, argue looping biases training toward steep
-valleys).
+looping (Gong et al. 2025, arXiv:2510.10089, conjecture that looping biases training toward
+steep valleys).
 
 Global: writes `curvature.json` into the run folder; `report.py` reads it for the
 manipulation check, tables and figures.

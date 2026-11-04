@@ -115,6 +115,8 @@ def results_table(s: dict) -> str:
             "| OOD %, K=n | tr(H) ± SE | dominant eigenvalue | Fisher trace ± SE | adaptive sharpness ρ=0.01 / 0.02 / 0.05 "
             "| weight norm | loss on measurement batch | training wall-clock (incl. periodic probes) |\n|---|---|---|---|---|---|---|---|---|---|---|---|\n")
     rows = []
+    # Measurement-batch size as recorded in the runs' own config.json (not a hard-coded number).
+    batch = next(iter(s["arms"].values()))["config"]["measure"]["batch"]
     if "chance" in s:
         rows.append(f"| chance (guess n+1 bits) | {100 * s['chance']['id']:.2g} | {100 * s['chance']['ood']:.2g} "
                     f"| – | – | – | – | – | – | – | – | – |")
@@ -139,7 +141,7 @@ def results_table(s: dict) -> str:
             "length), with 95% Wilson intervals that cover test-set sampling only, not seed-to-seed variance. "
             "The oracle K is chosen on the same test problems, so oracle accuracies are optimistic and their "
             "intervals too narrow; the label-free max-confidence column has no such selection. "
-            "Curvature metrics: fixed 512-problem training-distribution batch, read out at K = n.")
+            f"Curvature metrics: fixed {batch}-problem training-distribution batch, read out at K = n.")
     return head + "\n".join(rows) + note
 
 
@@ -297,7 +299,10 @@ def build_pdf(md_path: str = "reports/paper/paper.md") -> bool:
         print("pandoc not found; skipping PDF")
         return False
     folder, name = os.path.split(md_path)
-    cmd = ["pandoc", name, "-o", name.replace(".md", ".pdf"), "--pdf-engine=xelatex",
+    # lists_without_preceding_blankline: render "**Heading.**\n- item" as a list, as GitHub does
+    # (https://pandoc.org/MANUAL.html#extension-lists_without_preceding_blankline).
+    cmd = ["pandoc", name, "-f", "markdown+lists_without_preceding_blankline",
+           "-o", name.replace(".md", ".pdf"), "--pdf-engine=xelatex",
            "-V", "geometry:margin=2.2cm", "-V", "mainfont=Cambria", "-V", "monofont=Consolas",
            "-V", "mathfont=Cambria Math", "-V", "colorlinks=true", "-V", "fontsize=10pt",
            "--resource-path=.:.."]

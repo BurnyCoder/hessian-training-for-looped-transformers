@@ -5,8 +5,8 @@ with the dataviz skill's validator, all pairs pass CVD and normal-vision floors)
 model identity is also carried by line style, markers and direct labels, so no chart relies
 on color alone. One y-axis per panel; sequential blue ramp for heatmaps.
 
-Global: `report.py` calls `make_all_figures(runs, out_dir)` with the loaded run folders; every
-figure is regenerated from results/ files, never edited by hand.
+Global: `report.make_figures(summary, runs, out_dir)` calls these functions with the loaded run
+folders; every figure is regenerated from results/ files, never edited by hand.
 """
 
 import os
@@ -162,7 +162,9 @@ def loop_curvature(studies: dict, out_dir: str) -> str:
                    color=st["color"], ls=st["ls"], marker=st["marker"], ms=5, lw=2, capsize=2, label=st["label"])
         b.plot(ks, [r["dominant_eigenvalue"] for r in rows], color=st["color"], ls=st["ls"],
                marker=st["marker"], ms=5, lw=2, label=st["label"])
-    _style_axes(a, "tr(H) vs. loop count (20 probes, ±1 SE)", "loop count K (same for all problems)", "tr(H)")
+    # Probe count is read from the results (MeasureConfig.loop_probes, 10 after addendum 2).
+    probes = next(iter(studies.values()))[0]["trace"]["n_probes"]
+    _style_axes(a, f"tr(H) vs. loop count ({probes} probes, ±1 SE)", "loop count K (same for all problems)", "tr(H)")
     _style_axes(b, "Dominant Hessian eigenvalue vs. loop count", "loop count K", "eigenvalue (power iteration)")
     for ax in (a, b):
         ax.legend(fontsize=8, frameon=False, labelcolor=INK_2)
