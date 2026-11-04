@@ -8,7 +8,7 @@ date: "2026-11-01"
 
 Looped (weight-tied, recurrent-depth) transformers can generalize to longer inputs by iterating a shared block more times, but this extrapolation varies strongly across random seeds. Flat-minima arguments suggest that lowering loss curvature might make extrapolating solutions more likely.
 
-We preregistered a test of whether adding an exact Hutchinson estimate of the Hessian trace, λ·tr(H), to the training loss of a looped transformer changes length generalization on binary addition. Models were trained on operands of 1–19 bits and tested on 20–60 bits. This paper reports Stage 1: one penalized and one unpenalized model, with the same seed, initialization and data stream.
+We preregistered a test of whether adding an exact Hutchinson estimate of the Hessian trace, λ·tr(H), to the training loss of a looped transformer changes length generalization on binary addition. Models are trained on operands of 1–19 bits and tested on 20, 25, …, 60 bits. This paper reports Stage 1: one penalized and one unpenalized model, with the same seed, initialization and data stream.
 
 <!-- BEGIN:headline -->
 Stage 1 is in progress (finished arms: none).
@@ -21,17 +21,17 @@ We also found that PyTorch 2.15.0's native LayerNorm returns incorrect third der
 **Looped transformers and length generalization.**
 - A looped transformer applies one block K times, with the input re-injected at each iteration ([Dehghani et al. 2018](https://arxiv.org/abs/1807.03819); [Yang et al. 2024](https://arxiv.org/abs/2311.12424); [Fan et al. 2024](https://arxiv.org/abs/2409.15647)).
 - Because depth can grow at test time, such models can solve arithmetic and algorithmic problems longer than any seen in training (Fan et al. 2024).
-- [Kuo et al. 2026](https://arxiv.org/abs/2606.29983) show that this extrapolation is brittle. On binary addition, out-of-distribution (OOD) accuracy has an across-seed standard deviation of about 6–10 points, even among runs with near-identical in-distribution accuracy.
+- [Kuo et al. 2026](https://arxiv.org/abs/2606.29983) show that this extrapolation is brittle. On binary addition, the across-run standard deviation of mean out-of-distribution (OOD) accuracy is 5.9–9.9 points for looped models trained with fixed or randomized loop counts (32 runs each; their Table 1), even among runs with similar in-distribution accuracy. Per length, the across-run SD is 8.7–12.2 points for looped models against 0.5–0.9 points for non-looped transformers (their Sec. 4.1).
 
 **The flat-minima hypothesis and its critics.**
 - The hypothesis: among minimizers of the training loss, those in flat regions generalize better ([Hochreiter & Schmidhuber 1997](https://doi.org/10.1162/neco.1997.9.1.1); [Keskar et al. 2017](https://arxiv.org/abs/1609.04836)).
 - Sharpness measures are among the better predictors of generalization in large studies ([Jiang et al. 2020](https://arxiv.org/abs/1912.02178)).
-- In language models with equal pretraining loss, a lower Hessian trace accompanies better downstream accuracy ([Liu et al. 2023](https://arxiv.org/abs/2210.14199)).
+- In language models with equal pretraining loss, a lower Hessian trace correlates with better downstream accuracy ([Liu et al. 2023](https://arxiv.org/abs/2210.14199); shown on synthetic PCFG-, HMM- and OPT-generated data).
 - Counter-evidence and caveats:
   - Sharpness is not invariant to reparametrization ([Dinh et al. 2017](https://arxiv.org/abs/1703.04933)).
-  - It often fails to track OOD performance in modern transformers ([Andriushchenko et al. 2023](https://arxiv.org/abs/2302.07011)).
+  - It often fails to track generalization in modern settings, including transformers, and sometimes correlates negatively with OOD error ([Andriushchenko et al. 2023](https://arxiv.org/abs/2302.07011)).
   - The maximum eigenvalue can change without any change in generalization ([Kaur et al. 2023](https://arxiv.org/abs/2206.10654)).
-  - For looped models in particular, [Gong et al. 2025](https://arxiv.org/abs/2510.10089) argue that looping helps *because* it biases training toward steep "V-shaped" valleys.
+  - For looped models in particular, [Gong et al. 2025](https://arxiv.org/abs/2510.10089) conjecture, from empirical Hessian observations and theory in a simplified linear-attention setting, that looping biases training toward steep "V-shaped" valleys, and use this to explain looped models' better convergence.
 
 **Question.** Does explicitly penalizing tr(H) during training change the length generalization of a looped transformer?
 
@@ -41,14 +41,14 @@ Our literature sweeps found no prior application of SAM, NSO or explicit Hessian
 
 **Hutchinson's estimator.**
 - tr(H) = E_v[vᵀHv] for any v with E[vvᵀ] = I. With Rademacher v this is [Hutchinson's estimator](https://doi.org/10.1080/03610919008812866).
-- Hv is computed without forming H, by double backpropagation, using the vector-Jacobian product of the gradient ([PyTorch tutorial](https://docs.pytorch.org/tutorials/intermediate/jacobians_hessians.html)).
+- Hv is computed without forming H, by double backpropagation, using the vector-Jacobian product of the gradient (reverse-over-reverse; [PyTorch tutorial](https://docs.pytorch.org/tutorials/intermediate/jacobians_hessians.html)).
 - Using λ·vᵀHv as a training penalty requires its gradient ∇_θ(vᵀH(θ)v), which is a third-order derivative of the loss.
 - This penalty was used to regularize CNNs and LSTMs by [Liu, Yu & Lin 2022 (SEHT)](https://arxiv.org/abs/2208.05924).
 
 **Noise Stability Optimization (NSO)** ([Zhang, Li & Ju 2024](https://arxiv.org/abs/2306.08553)).
 - Update direction: ½[∇L(θ+U) + ∇L(θ−U)], with U ~ N(0, σ²I).
 - Its expectation is ∇L + (σ²/2)∇tr(H) + O(σ⁴). NSO is therefore a first-order, finite-difference estimator of the same objective, with λ = σ²/2.
-- It is the tr(H) regularizer with transformer and language-model results (GPT-2 chain-of-thought fine-tuning; CLIP).
+- Among Hessian-trace regularizers, it is the only one we found with transformer language-model results (GPT-2 chain-of-thought fine-tuning; a CLIP text encoder). SEHT's language-model results are for an LSTM.
 - In LLM practice, flatness is otherwise pursued with SAM ([Foret et al. 2021](https://arxiv.org/abs/2010.01412); [Bahri et al. 2022](https://arxiv.org/abs/2110.08529)) or with weight-noise and variational methods ([Flat-LoRA](https://arxiv.org/abs/2409.14396); [IVON](https://arxiv.org/abs/2402.17641)).
 - Stage 1 uses the exact Hutchinson penalty. NSO and SAM are Stage 2 arms.
 
@@ -56,10 +56,11 @@ Our literature sweeps found no prior application of SAM, NSO or explicit Hessian
 
 ## 3.1 Task and data
 
-**Format.** Binary addition in the full-output-prediction format of Fan et al. 2024:
+**Format.** Binary addition in a variant of the full-output-prediction format of Fan et al. 2024:
 - Input: `a + b >` followed by n+2 placeholders.
 - Target: the (n+1)-bit sum, most significant bit first, then EOS.
-- Loss is applied only on answer positions.
+- Loss is applied only on these n+2 answer positions.
+- Fan et al.'s code instead starts the sum at the `>` position and supervises every trailing EOS position.
 
 **Training data.**
 - Operand lengths n ∈ [1, 19].
@@ -84,7 +85,7 @@ A weight-tied block of 3 pre-LayerNorm GPT-2 layers:
 ## 3.3 Training
 
 **Shared settings.**
-- AdamW (lr 1e-4, betas 0.9/0.999, weight decay 0.01), cosine decay to 0.
+- AdamW (lr 1e-4, betas 0.9/0.999, weight decay 0.01), cosine decay to 0 over the whole run (as in Kuo et al. 2026; Fan et al. start the decay only after the curriculum ends).
 - Batch 64, gradient clipping at 1.0, 30,000 steps.
 - fp32 with TF32 matmuls.
 - Both arms use seed 0. The data and loop-count stream comes from one generator, so the two models see identical batches from identical initial weights.
@@ -99,25 +100,25 @@ The sub-batch size and the 8-step amortization were forced by the 8 GB GPU. They
 
 ## 3.4 Third-order autodiff correctness
 
-The penalty's gradient was checked against central finite differences of vᵀHv on a float64 copy of the model, with differences that agree across step sizes.
+The penalty's gradient was checked against a central finite difference of vᵀHv (step 10⁻⁵, relative tolerance 10⁻⁵) on a float64 copy of the model and on each operation separately.
 
 **Finding: PyTorch 2.15.0's native `layer_norm` gives incorrect third derivatives.**
 - All other operations in the model agree with finite differences: GELU, math scaled-dot-product attention, embedding, tied head, cross-entropy, and the per-sample read-out.
-- An all-ones probe hides the error.
+- Rademacher probes expose the error. A probe that only shifts LayerNorm's input by a constant across the normalized dimension (e.g. all ones) hides it, because LayerNorm is invariant to that shift and vᵀHv is then identically zero.
 - We therefore build the penalty's graph with a composite LayerNorm (mean, variance, rsqrt). Elsewhere we keep the native kernel, whose first and second derivatives are correct.
 
 ## 3.5 Measurements
 
-**Primary metric:** mean OOD exact match at the per-length best loop count ("oracle", Kuo et al.'s metric).
+**Primary metric:** mean OOD exact match at the per-length best loop count ("oracle"). This adapts the oracle of Kuo et al., which picks the best K per example from {1, …, n+2}; ours picks one K per length from {1, …, n+5}, so their published numbers are not directly comparable.
 
 **Secondary metrics:**
 - Label-free maximum-confidence stopping (Fan et al.).
 - K = n.
 - ID accuracy.
-- Curvature on a fixed batch of training-distribution problems at K = n:
+- Curvature on a fixed batch of 128 training-distribution problems at K = n:
   - Hutchinson tr(H) with standard error, overall and per parameter group;
   - dominant eigenvalue by power iteration;
-  - Fisher trace via sampled labels (Liu et al. 2023);
+  - Fisher trace via sampled labels (the Gauss–Newton–Bartlett estimator of [Sophia](https://arxiv.org/abs/2305.14342); a batched form of the estimator in Liu et al. 2023, App. B.1);
   - average-case adaptive sharpness (Andriushchenko et al. 2023);
   - weight norms.
 - A loop-count study of tr(H) at fixed K.
@@ -126,7 +127,7 @@ The penalty's gradient was checked against central finite differences of vᵀHv 
 
 ## 3.6 Preregistered reading of a single-seed difference
 
-With one seed per arm, seed variance cannot be estimated. Using Kuo et al.'s reported SD of about 5.9 points, a difference between two single runs has an SD of about 8.3 points.
+With one seed per arm, seed variance cannot be estimated. Kuo et al. report an across-run SD of 5.9 points for mean OOD accuracy with randomized loop counts on addition (32 runs, their Table 1; measured with their per-example oracle, so it is an approximate reference here). With that SD, a difference between two single runs has an SD of about 8.3 points.
 
 - A difference Δ in the primary metric is called "suggestive" only if |Δ| > 2·√2·5.9 ≈ 16.7 points; otherwise it is "inconclusive at n = 1 seed".
 - Wilson intervals and a paired McNemar test cover test-set sampling only.
@@ -158,14 +159,14 @@ Pending.
 
 # 6. Limitations
 
-- **One seed per arm.** Looped models' OOD accuracy varies by 6–10 points across seeds (Kuo et al. 2026), so Stage 1 cannot separate an effect of the penalty from seed luck.
-- **λ was not tuned.** It was fixed in advance from NSO's σ grid, which was tuned for fine-tuning ResNets, not for a looped transformer trained from scratch.
+- **One seed per arm.** The across-run SD of looped models' mean OOD accuracy on addition is 5.9–9.9 points (Kuo et al. 2026, Table 1), so Stage 1 cannot separate an effect of the penalty from seed luck.
+- **λ was not tuned.** It was fixed in advance from NSO's σ grid {0.008, 0.01, 0.012}, which NSO's paper reports for fine-tuning ResNet-34, not for a looped transformer trained from scratch.
 - **The penalty is a high-variance estimator, further altered by the compute constraints.**
   - It uses one probe and 4 problems, applied every 8th step with an 8× weight.
   - On penalty steps, gradient clipping at 1.0 lets the penalty direction dominate the update.
   - The effect of curvature regularization is therefore confounded with injected gradient noise. Stage 2's random-direction control is designed to separate the two.
 - **30k training steps,** against 100k in Fan et al. and Kuo et al.
-- **The primary metric uses labels to pick the loop count per length.** Label-free metrics are reported alongside.
+- **The primary metric uses labels to pick the loop count per length.** Label-free metrics are reported alongside. It also differs from Kuo et al.'s per-example oracle, so it cannot be compared directly with their published numbers.
 - **A single task** (binary addition).
 - **Short ID lengths overlap with training problems,** which is unavoidable for small n.
 
@@ -177,15 +178,15 @@ Pending.
   - looped transformers for in-context learning ([Yang et al. 2024](https://arxiv.org/abs/2311.12424));
   - looped transformers for length generalization ([Fan et al. 2024](https://arxiv.org/abs/2409.15647));
   - latent-thought reasoning ([Saunshi et al. 2025](https://arxiv.org/abs/2502.17416));
-  - recurrent-depth LLMs ([Geiping et al. 2025](https://arxiv.org/abs/2502.05171); [Ouro, 2025](https://arxiv.org/abs/2510.25741));
-  - stochastic stopping for stable extrapolation ([Kuo et al. 2026](https://arxiv.org/abs/2606.29983)).
+  - recurrent-depth LLMs ([Geiping et al. 2025](https://arxiv.org/abs/2502.05171); Ouro, [Zhu et al. 2025](https://arxiv.org/abs/2510.25741));
+  - randomized and learned stochastic stopping for stable extrapolation ([Kuo et al. 2026](https://arxiv.org/abs/2606.29983)).
 - **Stability regularizers for looped and equilibrium models:**
   - Jacobian regularization of deep equilibrium models ([Bai et al. 2021](https://arxiv.org/abs/2106.14342));
   - path independence ([Anil et al. 2022](https://arxiv.org/abs/2211.09961));
-  - spectral-radius regularization ([STARS, 2026](https://arxiv.org/abs/2605.26733)).
+  - spectral-radius regularization of looped language models (STARS, [Yang et al. 2026](https://arxiv.org/abs/2605.26733)).
   - These target the state-space Jacobian, not parameter-space curvature.
 - **Curvature regularization:**
-  - SAM ([Foret et al. 2021](https://arxiv.org/abs/2010.01412)) and its link to trace minimization ([Wen et al. 2023](https://arxiv.org/abs/2211.05729));
+  - SAM ([Foret et al. 2021](https://arxiv.org/abs/2010.01412)), which with batch size 1 implicitly minimizes tr(H) while full-batch SAM minimizes the largest eigenvalue ([Wen et al. 2023](https://arxiv.org/abs/2211.05729));
   - gradient-norm penalties ([Zhao et al. 2022](https://arxiv.org/abs/2202.03599));
   - anticorrelated noise ([Orvieto et al. 2022](https://arxiv.org/abs/2202.02831));
   - SEHT ([Liu et al. 2022](https://arxiv.org/abs/2208.05924));
@@ -204,6 +205,8 @@ The preregistration ([reports/preregistration.md](../preregistration.md)) was co
 - sequential runs;
 - the composite LayerNorm in penalty graphs;
 - the step budget S = 30,000.
+
+Addendum 2 (before training) records a restart of the baseline run after its in-training curvature probe spilled out of GPU memory, a GPU memory cap, and a smaller curvature measurement (batch 512 → 128 problems; loop-count study with 10 probes and 10 power iterations instead of 20). Addendum 3 (a fact-check, before any Stage 1 evaluation) corrects how the task format, the oracle metric, the learning-rate schedule and several citations relate to their sources.
 
 # Appendix B: Per-length results
 

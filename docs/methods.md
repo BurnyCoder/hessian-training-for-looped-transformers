@@ -12,8 +12,8 @@ In a looped model the weights are shared across iterations. H therefore collects
 
 For a random vector v with E[v vᵀ] = I, E[vᵀHv] = tr(H) ([Hutchinson 1990](https://doi.org/10.1080/03610919008812866)).
 
-- **Probe distribution.** Rademacher v (entries ±1) minimizes the estimator's variance among i.i.d. probes. The variance is 2(‖H‖_F² − Σ_i H_ii²).
-- **Computing Hv without forming H.** Use the gradient's vector–Jacobian product: Hv = ∇_θ(∇_θL · v). This is the "vjp over grad" construction of the [PyTorch tutorial](https://docs.pytorch.org/tutorials/intermediate/jacobians_hessians.html), implemented in `linalg.hvp_from_grads`.
+- **Probe distribution.** Rademacher v (entries ±1) minimizes the estimator's variance among real probes with i.i.d. entries. The variance is 2(‖H‖_F² − Σ_i H_ii²) ([Avron & Toledo 2011](https://doi.org/10.1145/1944345.1944349), Lemma 1).
+- **Computing Hv without forming H.** Use the gradient's vector–Jacobian product: Hv = ∇_θ(∇_θL · v). This is the reverse-over-reverse construction, `vjp(grad(f))`, of the [PyTorch tutorial](https://docs.pytorch.org/tutorials/intermediate/jacobians_hessians.html), here written with `torch.autograd.grad` in `linalg.hvp_from_grads`. (The tutorial notes that forward-over-reverse is usually more memory-efficient; reverse-over-reverse is used here because its graph can be differentiated once more for the penalty.)
 - **Training penalty** (`regularizers.hutchinson_penalty`):
   ```
   g  = autograd.grad(L_sub, θ, create_graph=True)     # first order, graph kept
@@ -47,12 +47,12 @@ So NSO is a first-order, finite-difference estimator of the gradient of the same
 The penalty's gradient is a third derivative of L.
 
 **How it was checked** (`tests/test_third_order.py`, `tests/test_regularizers.py`):
-- Each op, and the full float64 model, is compared against central finite differences of vᵀHv itself.
-- The step sizes are 1e-4 and 1e-5. Their estimates agree to about 1e-6 relative, so truncation error is negligible.
+- Each op, and the full float64 model, is compared against a central finite difference of vᵀHv itself, along a random direction u.
+- The tests use step h = 1e-5 and a relative tolerance of 1e-5. During development, estimates at other step sizes agreed with it far more closely than the size of the native-LayerNorm error, so that error is not a finite-difference artifact.
 
 **Finding (torch 2.15.0):**
-- `torch.nn.functional.layer_norm` returns a wrong third-order directional derivative. Relative error ranged from 0.16 to 1.3 across random draws.
-- An all-ones probe hides the error; Rademacher probes expose it.
+- `torch.nn.functional.layer_norm` returns a wrong third-order directional derivative. The relative error depends strongly on the random draw, from well under 1% to tens of percent; the composite formula agrees with finite differences to within the tolerance.
+- Rademacher probes expose the error. A probe that only shifts LayerNorm's input by a constant across the normalized dimension (for example all ones on the input, or on a preceding weight matrix without affine LayerNorm parameters) hides it: LayerNorm is invariant to that shift, so vᵀHv is identically zero and autograd and finite differences trivially agree.
 - GELU, math SDPA, embedding, the tied head, cross-entropy and `torch.where` are correct.
 - Native LayerNorm's first and second derivatives are correct (HVP and trace tests).
 
@@ -68,8 +68,8 @@ Every measurement is of the full-batch loss on a fixed measurement batch. The ba
 |---|---|---|
 | tr(H), per-group block traces | Hutchinson. The same probes are reused across chunks, so each probe gives vᵀHv of the full batch. SE = sd/√n_probes. Block traces are v_gᵀ(Hv)_g. | Hutchinson 1990; per-block view: [Zhang et al. 2024](https://arxiv.org/abs/2402.16788) |
 | Dominant eigenvalue | Power iteration on H, stopping on relative change < tol. Finds the eigenvalue of largest magnitude, as in PyHessian. | [Yao et al. 2020](https://arxiv.org/abs/1912.07145) |
-| Fisher (= Gauss–Newton for softmax CE) trace | tr(G) = N·E‖∇L̂‖², where L̂ uses labels sampled from the model. The cross terms vanish because each score has zero mean. | Bartlett identity as used by [Liu et al. 2023](https://arxiv.org/abs/2210.14199); GNB in [Sophia](https://arxiv.org/abs/2305.14342) |
-| Adaptive average sharpness | E_ε[L(θ + ε⊙\|θ\|)] − L(θ), with ε ~ N(0, ρ²I) | [Andriushchenko et al. 2023](https://arxiv.org/abs/2302.07011) |
+| Fisher (= Gauss–Newton for softmax CE) trace | tr(G) = N·E‖∇L̂‖², where L̂ uses labels sampled from the model and N is the number of sampled labels (answer tokens). The cross terms vanish because each score has zero mean. | Batched form: the Gauss–Newton–Bartlett (GNB) estimator of [Sophia](https://arxiv.org/abs/2305.14342) (Alg. 2). Per-example form via the Bartlett identity: [Liu et al. 2023](https://arxiv.org/abs/2210.14199), App. B.1 |
+| Adaptive average sharpness | E_ε[L(θ + ε⊙\|θ\|)] − L(θ), with ε ~ N(0, ρ²I). Invariant to multiplicative reparametrizations that leave the network function unchanged (f(θ⊙c) = f(θ)). | [Andriushchenko et al. 2023](https://arxiv.org/abs/2302.07011), Eq. 1 with c = \|θ\| |
 | Weight norms | L2 norm per group | Scale-invariance caveat: [Dinh et al. 2017](https://arxiv.org/abs/1703.04933) |
 
 Each estimator is tested against float64 finite-difference Hessians of a tiny model (`tests/test_curvature.py`).
@@ -78,7 +78,7 @@ Each estimator is tested against float64 finite-difference Hessians of a tiny mo
 
 For each test length n, the model runs K = 1…n+5 iterations in one pass, and every iteration's prediction is scored.
 
-- **Oracle:** the K with the best accuracy for that length. This is the primary metric; it uses labels. Source: [Kuo et al. 2026](https://arxiv.org/abs/2606.29983).
+- **Oracle:** the K with the best accuracy for that length. This is the primary metric; it uses labels. It is a per-length variant of the oracle of [Kuo et al. 2026](https://arxiv.org/abs/2606.29983) (Sec. 3.3), which picks the best K *per example* from {1, …, n+2}. Kuo et al.'s numbers are therefore not directly comparable with ours.
 - **Max-confidence:** the K with the highest mean log max-probability over answer positions. Label-free; a batch variant of [Fan et al. 2024](https://arxiv.org/abs/2409.15647), Eq. 2.
 - **K = n.**
 
