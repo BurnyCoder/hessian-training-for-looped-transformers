@@ -1,11 +1,13 @@
 """Third-order autograd correctness for every op in LoopedGPT (regression test).
 
 Global context: the Hutchinson penalty's gradient ∇(vᵀHv) is a third derivative of the
-loss. We compare autograd against central differences of vᵀHv itself (float64, two step
-sizes that agree, so truncation error is negligible). While building this project the
-native `torch.nn.functional.layer_norm` failed this check in PyTorch 2.15.0 (only for
-non-constant probes; an all-ones probe hides it), which is why model.py uses a composite
-LayerNorm. The native op is kept here as an xfail so a future PyTorch fix becomes visible.
+loss. We compare autograd against a central difference of vᵀHv itself (float64, step
+h = 1e-5, relative tolerance 1e-5). While building this project the native
+`torch.nn.functional.layer_norm` failed this check in PyTorch 2.15.0, which is why model.py
+uses a composite LayerNorm. A probe that only shifts LayerNorm's input by a constant across
+the normalized dimension (e.g. all ones on the input) hides the error, because LayerNorm is
+invariant to that shift and vᵀHv is then identically zero; Rademacher probes expose it.
+The native op is kept here as an xfail so a future PyTorch fix becomes visible.
 """
 
 import pytest

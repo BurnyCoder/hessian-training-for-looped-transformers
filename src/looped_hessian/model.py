@@ -31,9 +31,9 @@ from looped_hessian.data import VOCAB_SIZE
 
 @dataclass
 class ModelConfig:
-    d_model: int = 256  # Fan et al. use embedding dim 256 for all tasks
-    n_layer: int = 3  # layers inside the shared block (Fan et al. use 3 for addition)
-    n_head: int = 8  # attention heads (Fan et al. use 8 for addition)
+    d_model: int = 256  # Fan et al. use embedding dim 256 for all tasks (App. F)
+    n_layer: int = 3  # layers inside the shared block (Fan et al. use 3 for addition, App. F Table 2)
+    n_head: int = 8  # attention heads (Fan et al. use 8 for addition, App. F Table 2)
     mlp_ratio: int = 4  # GPT-2 MLP expansion
     vocab_size: int = VOCAB_SIZE
 

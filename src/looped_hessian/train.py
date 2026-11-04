@@ -1,6 +1,7 @@
 """Training loop shared by all arms (only the step strategy differs).
 
-Local: AdamW + cosine decay to 0 without warmup (Fan et al. 2024; Kuo et al. 2026), batch
+Local: AdamW + cosine decay to 0 over the whole run without warmup (as in Kuo et al. 2026;
+Fan et al. 2024 keep the lr constant until the curriculum ends and only then decay it), batch
 64, gradient-norm clipping, linear length curriculum and randomized loop counts. The data
 stream (lengths, operand bits, loop counts) comes from one CPU generator seeded with the
 run seed, and the model is initialised right after `torch.manual_seed(seed)`, so two arms

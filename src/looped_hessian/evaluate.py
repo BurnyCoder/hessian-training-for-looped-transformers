@@ -4,7 +4,9 @@ Local: for each test length, the model is run once for K = 1 .. n + extra_loops 
 and the prediction after every iteration is scored (exact match over all n+2 answer
 positions) together with a label-free confidence (mean log max-probability over the answer
 positions). Three ways to pick the loop count per length (preregistration Sec. 3):
-- oracle: the K with the highest accuracy (Kuo et al. 2026, arXiv:2606.29983; uses labels);
+- oracle: the K with the highest accuracy for the length (uses labels). This is a per-length
+  variant of the oracle of Kuo et al. 2026 (arXiv:2606.29983, Sec. 3.3), which picks the
+  best K per example from {1..n+2}, so the two are not directly comparable;
 - max_confidence: the K with the highest mean confidence over the length's test problems,
   a label-free batch variant of Fan et al. 2024's maximum-confidence rule (arXiv:2409.15647,
   Eq. 2, Appendix B);
