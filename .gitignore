@@ -13,7 +13,8 @@ wheels/
 
 # Large artifacts: checkpoints go to Hugging Face, datasets are regenerated from seeds
 checkpoints/
-data/
+# Root-level datasets only: site/data/ holds the generated summary the GitHub Pages site loads.
+/data/
 *.pt
 *.safetensors
 
