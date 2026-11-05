@@ -1,6 +1,6 @@
 # Experiment report: Stage 1, one Hessian-penalized vs one plain looped transformer
 
-**Status:** descriptive single-seed comparison, preregistered in [preregistration.md](preregistration.md) (Sections 4 and 6, Addenda 1–3).
+**Status:** descriptive single-seed comparison, preregistered in [preregistration.md](preregistration.md) (Sections 4 and 6, Addenda 1–4).
 
 All numbers on this page are injected by `uv run python main.py report` from `results/stage1_*`. None are typed by hand.
 
