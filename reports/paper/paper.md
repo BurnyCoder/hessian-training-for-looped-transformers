@@ -21,7 +21,7 @@ We also found that PyTorch 2.15.0's native LayerNorm returns incorrect third der
 **Looped transformers and length generalization.**
 - A looped transformer applies one block K times, with the input re-injected at each iteration ([Dehghani et al. 2018](https://arxiv.org/abs/1807.03819); [Yang et al. 2024](https://arxiv.org/abs/2311.12424); [Fan et al. 2024](https://arxiv.org/abs/2409.15647)).
 - Because depth can grow at test time, such models can solve arithmetic and algorithmic problems longer than any seen in training (Fan et al. 2024).
-- [Kuo et al. 2026](https://arxiv.org/abs/2606.29983) show that this extrapolation is brittle. On binary addition, the across-run standard deviation of mean out-of-distribution (OOD) accuracy is 5.9–9.9 points for looped models trained with fixed or randomized loop counts (32 runs each; their Table 1), even among runs with similar in-distribution accuracy. Per length, the across-run SD is 8.7–12.2 points for looped models against 0.5–0.9 points for non-looped transformers (their Sec. 4.1).
+- [Kuo et al. 2026](https://arxiv.org/abs/2606.29983) show that this extrapolation is brittle. On binary addition, the across-run standard deviation of mean out-of-distribution (OOD) accuracy is 5.9–9.9 points for looped models trained with fixed or randomized loop counts (32 runs each; their Table 1), even among runs with similar in-distribution accuracy. Averaged over the OOD lengths 20–60, the per-length across-run SD is 8.7–12.2 points for looped models with fixed or length-matched loop counts (K = 20, K = n) against 0.5–0.9 points for 60- and 3-layer non-looped transformers (their Sec. 4.1 and Fig. 6).
 
 **The flat-minima hypothesis and its critics.**
 - The hypothesis: among minimizers of the training loss, those in flat regions generalize better ([Hochreiter & Schmidhuber 1997](https://doi.org/10.1162/neco.1997.9.1.1); [Keskar et al. 2017](https://arxiv.org/abs/1609.04836)).
@@ -206,7 +206,7 @@ The preregistration ([reports/preregistration.md](../preregistration.md)) was co
 - the composite LayerNorm in penalty graphs;
 - the step budget S = 30,000.
 
-Addendum 2 (before training) records a restart of the baseline run after its in-training curvature probe spilled out of GPU memory, a GPU memory cap, and a smaller curvature measurement (batch 512 → 128 problems; loop-count study with 10 probes and 10 power iterations instead of 20). Addendum 3 (a fact-check, before any Stage 1 evaluation) corrects how the task format, the oracle metric, the learning-rate schedule and several citations relate to their sources.
+Addendum 2 (before training) records a restart of the baseline run after its in-training curvature probe spilled out of GPU memory, a GPU memory cap, and a smaller curvature measurement (batch 512 → 128 problems; loop-count study with 10 probes and 10 power iterations instead of 20). Addendum 3 (a fact-check, before any Stage 1 evaluation) corrects how the task format, the oracle metric, the learning-rate schedule and several citations relate to their sources. Addendum 4 (a second fact-check, before any Stage 1 evaluation) corrects the recorded benchmark step counts and the description of Kuo et al.'s per-length seed variance.
 
 # Appendix B: Per-length results
 
