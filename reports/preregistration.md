@@ -276,3 +276,11 @@ Scope set by the project owner on 2026-11-01: train exactly two models today. Ev
    - NSO is the only Hessian-trace regularizer we found with *transformer language-model* results (GPT-2 chain-of-thought fine-tuning; a CLIP text encoder).
 7. **Fisher trace (Sec. 3, "Metrics").** The implemented batched sampled-label estimator, N·E‖∇L̂‖², is the Gauss–Newton–Bartlett estimator of [Sophia](https://arxiv.org/abs/2305.14342) (Alg. 2). Liu et al. 2023 (App. B.1) use a per-example form of the same Bartlett identity.
 8. **Liu et al. 2023 (Sec. 1).** "Lower tr(H) predicts better downstream accuracy" is a correlation, shown on language models trained on synthetic PCFG-, HMM- and OPT-generated data.
+
+
+### Addendum 4: 2026-11-05 (UTC+1), second fact-check before any Stage 1 evaluation
+
+**State when written.** No Stage 1 results are committed: `results/` holds only `results/benchmark/*.json`. Nothing here changes the training objective, data, model, metrics, thresholds or analysis plan.
+
+1. **Benchmark lengths (Addendum 1).** The committed benchmark files record 16–100 timed steps (`steps_timed` in `results/benchmark/*.json`), not "16–200". The step-budget numbers (0.201 and 0.446 s/step) come from `benchmark_final_alone.json`, which timed 64 steps per arm. Section 4 planned 200 steps per arm. The projected 5.4 h and 9.0 h follow from those two numbers as stated.
+2. **Per-length seed variance (Addendum 3, item 3).** Kuo et al.'s 8.7 (K = 20) and 12.2 (K = n) points, against 0.9 and 0.5 points for the 3- and 60-layer non-looped transformers, are the per-length across-run SDs averaged over OOD lengths 20–60 (their Sec. 4.1 and Fig. 6). They are not values for any single length.
