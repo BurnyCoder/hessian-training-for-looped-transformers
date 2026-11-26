@@ -23,12 +23,11 @@ import sys
 
 import torch  # noqa: E402
 
-from looped_hessian.config import RunConfig, TrainConfig  # noqa: E402
+from looped_hessian.config import RunConfig, smoke_config  # noqa: E402
 from looped_hessian.log import get_logger  # noqa: E402
 
-# TF32 matmuls (fp32 storage), identical for every arm. Deterministic kernels are NOT forced:
-# they made the baseline step ~25% slower (results/benchmark: 0.25 vs 0.20 s/step); runs are seeded but not bitwise
-# reproducible (https://docs.pytorch.org/docs/stable/notes/randomness.html).
+# Allow high-throughput matmul implementations for FP32 tensors. Kernel choice is hardware dependent.
+# https://docs.pytorch.org/docs/2.15/generated/torch.set_float32_matmul_precision.html
 torch.set_float32_matmul_precision("high")
 # Windows consoles default to cp1252; results text contains symbols such as Δ and ρ.
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -46,9 +45,7 @@ def make_config(args) -> RunConfig:
 
 def phase_train(cfg: RunConfig):
     from looped_hessian.train import train
-    os.makedirs(cfg.run_dir, exist_ok=True)
-    with open(os.path.join(cfg.run_dir, "config.json"), "w") as f:
-        json.dump(cfg.to_dict(), f, indent=2)
+    cfg.write_new_config()
     return train(cfg, get_logger(cfg.name, os.path.join(cfg.run_dir, "train.log")))
 
 
@@ -67,7 +64,7 @@ def phase_evaluate(cfg: RunConfig):
             json.dump({str(k): v for k, v in res.items()}, f)
         if ckpt == "final.pt":
             # Qualitative examples at the oracle loop count of a few OOD lengths.
-            examples = {str(n): output_examples(model, n, 4, seed=60_000 + n, k=res[n]["oracle"]["k"],
+            examples = {str(n): output_examples(model, n, 4, seed=ec.example_seed_base + n, k=res[n]["oracle"]["k"],
                                                 device=cfg.device)
                         for n in (20, 30, 60) if n in res}
             with open(os.path.join(cfg.run_dir, "examples.json"), "w") as f:
@@ -98,18 +95,14 @@ def phase_benchmark(args):
 def phase_smoke():
     # Tiny version of the whole pipeline: verifies plumbing, not science.
     for arm in ("baseline", "hutchinson"):
-        cfg = RunConfig(name=f"smoke_{arm}", output_dir="results/smoke", checkpoint_dir="checkpoints/smoke",
-                        train=TrainConfig(arm=arm, steps=60, log_every=20, curvature_every=30, eval_every=30,
-                                          eval_count=20, curvature_probes=2, curvature_batch=16))
-        cfg.eval.id_lengths, cfg.eval.ood_lengths, cfg.eval.n_per_length = (1, 5, 19), (20, 30), 20
-        cfg.measure.batch, cfg.measure.probes, cfg.measure.power_iters = 32, 3, 3
-        cfg.measure.fisher_samples, cfg.measure.sharpness_draws = 2, 2
-        cfg.measure.loop_ks, cfg.measure.loop_probes, cfg.measure.loop_power_iters = (1, 4), 2, 2
-        phase_train(cfg)
+        cfg = smoke_config(arm)
+        outcome = phase_train(cfg)
+        if outcome["status"] != "completed":
+            continue
         phase_evaluate(cfg)
         phase_measure(cfg)
     from looped_hessian.report import build_report
-    build_report(results_dir="results/smoke", prefix="smoke_", write_docs=False)
+    build_report(results_dir=cfg.output_dir, prefix="smoke_", write_docs=False)
 
 
 def main():
@@ -128,10 +121,8 @@ def main():
     parser.add_argument("--tag", default="single")
     args = parser.parse_args()
     if args.phase not in ("report", "publish") and torch.cuda.is_available():
-        # Cap the caching allocator below physical VRAM: on Windows (WDDM) allocations beyond VRAM do
-        # not fail but silently fall back to system memory, which made evaluation ~30x slower in our
-        # tests. With a cap, the allocator frees cached blocks and retries instead. Report/publish
-        # phases never touch the GPU, so they do not create a CUDA context next to a training run.
+        # Bound PyTorch's caching allocator for GPU phases. The archived benchmarks record
+        # allocated bytes and elapsed time; they contain no driver-level residency telemetry.
         torch.cuda.set_per_process_memory_fraction(float(os.getenv("LH_GPU_MEM_FRACTION", "0.85")))
     if args.phase == "benchmark":
         return phase_benchmark(args)
@@ -139,13 +130,18 @@ def main():
         return phase_smoke()
     if args.phase == "report":
         from looped_hessian.report import build_report
-        return build_report()
+        return build_report(results_dir=os.getenv("LH_OUTPUT_DIR", "results"))
     if args.phase == "publish":
         from looped_hessian.publish import publish
-        return publish()
+        return publish(results_dir=os.getenv("LH_OUTPUT_DIR", "results"),
+                       checkpoint_dir=os.getenv("LH_CHECKPOINT_DIR", "checkpoints"))
     cfg = make_config(args)
+    if args.phase in ("evaluate", "measure"):
+        cfg = RunConfig.from_record(cfg)
     if args.phase in ("train", "run"):
-        phase_train(cfg)
+        outcome = phase_train(cfg)
+        if outcome["status"] != "completed":
+            return
     if args.phase in ("evaluate", "run"):
         phase_evaluate(cfg)
     if args.phase in ("measure", "run"):

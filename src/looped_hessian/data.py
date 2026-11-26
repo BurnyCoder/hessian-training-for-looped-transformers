@@ -13,8 +13,8 @@ the n+1 sum bits plus one EOS are supervised.
 
 Global: the training loop samples lengths through `curriculum_max_len`, loop counts
 through `sample_loop_counts` (the randomized-loop schedule of Kuo et al. 2026,
-arXiv:2606.29983), and evaluation uses `make_eval_set` with dedicated seeds so test
-problems never share an RNG stream with training.
+arXiv:2606.29983). Evaluation uses explicit seeds; the archived smoke/final prefix overlap
+and short-width operand repetitions are documented in the scientific audit.
 """
 
 import torch
@@ -97,6 +97,14 @@ def sample_loop_counts(lengths: torch.Tensor, gen: torch.Generator, jitter: int,
     """
     offsets = torch.randint(-jitter, jitter + 1, lengths.shape, generator=gen)
     return (lengths + offsets).clamp(1, max_loops)
+
+
+def evaluation_count(spec: int | dict, length: int) -> int:
+    """Resolve either a common test size or a configured count for this length (JSON or Python keys)."""
+    count = spec.get(str(length), spec.get(length)) if isinstance(spec, dict) else spec
+    if type(count) is not int or count < 1:
+        raise ValueError(f"n={length}: a positive integer evaluation count is required")
+    return count
 
 
 def make_eval_set(length: int, count: int, seed: int) -> tuple[torch.Tensor, torch.Tensor]:

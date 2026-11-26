@@ -1,0 +1,9 @@
+{
+  "name": "smoke_hutchinson",
+  "status": "completed",
+  "steps_done": 60,
+  "train_seconds": 26.86298370361328,
+  "step_seconds": 22.003429412841797,
+  "n_params": 2371328,
+  "peak_memory_gb": 4.456523776
+}

@@ -3,7 +3,7 @@
 Local: every measurement is of the full-batch mean loss L on a fixed measurement batch,
 evaluated in chunks to bound memory. Because L = Σ_c w_c L_c with w_c = (labelled tokens in
 chunk c) / (all labelled tokens), Hessians, gradients and losses combine exactly with the
-same weights, so results do not depend on the chunk size.
+same weights in exact arithmetic. Floating-point reduction and random sampling can differ across chunk sizes.
 
 Metrics (preregistration Sec. 3):
 - `hutchinson_trace`: tr(H) = E[vᵀHv], Rademacher v (Hutchinson 1990), with standard error,
@@ -13,16 +13,16 @@ Metrics (preregistration Sec. 3):
   arXiv:1912.07145, github.com/amirgholami/PyHessian, MIT); returns the eigenvalue of
   largest magnitude.
 - `fisher_trace`: trace of the Fisher = Gauss-Newton matrix for softmax cross-entropy,
-  tr(G) = N · E||∇L̂||² where L̂ uses labels sampled from the model and N counts the sampled
+  tr(G) = N · E||∇L̂||² where L̂ uses independent model-sampled labels and N counts the sampled
   labels (answer tokens): the batched Gauss-Newton-Bartlett estimator of Sophia
   (arXiv:2305.14342, Alg. 2); Liu et al. 2023 (arXiv:2210.14199, App. B.1) use the
   per-example Bartlett form. Cross terms vanish because each sampled-label score has zero
   mean under the model.
 - `adaptive_sharpness`: average-case adaptive sharpness E_ε[L(θ + ε⊙|θ|)] − L(θ),
   ε ~ N(0, ρ²I) (Andriushchenko et al. 2023, arXiv:2302.07011, Eq. 1 with c = |θ|), which is
-  invariant to function-preserving multiplicative reparametrizations f(θ⊙c) = f(θ), unlike
+  invariant under coordinatewise multiplicative symmetries preserving the function throughout the perturbed neighborhood, unlike
   tr(H) (Dinh et al. 2017, arXiv:1703.04933).
-- `weight_norms`: per-group L2 norms, to detect tr(H) reductions bought by norm growth.
+- `weight_norms`: per-group L2 norms to describe scale changes alongside signed trace changes.
 """
 
 import math

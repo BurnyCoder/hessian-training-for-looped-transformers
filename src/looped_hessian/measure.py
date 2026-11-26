@@ -1,6 +1,6 @@
 """Curvature measurement phase: every preregistered sharpness metric for one checkpoint.
 
-Local: all metrics use the same fixed measurement batch from the training distribution
+Local: all metrics use the same fixed, length-uniform batch over the planned training widths
 (`MeasureConfig.batch`, 128 problems after preregistration addendum 2; 512 originally),
 read out at K = n, with fixed probe seeds, so different models are measured identically
 (preregistration Sec. 3). The loop-count study re-measures tr(H) and the dominant
@@ -24,6 +24,7 @@ from looped_hessian.train import fixed_batch
 
 
 def measure(model, cfg: RunConfig, logger, out_name: str = "curvature.json") -> dict:
+    model.eval()  # Fixed measurement protocol. Gradients remain enabled for Hessian products.
     mc = cfg.measure
     t0 = time.time()
     batch = fixed_batch(mc.batch, cfg.train.max_train_len, seed=mc.seed)

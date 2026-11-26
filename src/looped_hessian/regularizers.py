@@ -1,12 +1,12 @@
-"""Training-step strategies: plain loss (baseline) and loss + exact Hutchinson tr(H) penalty.
+"""Training-step strategies: token-mean loss with an optional stochastic Hessian-trace term.
 
 Local: every strategy is a callable `step(model, x, y, loops) -> metrics` that leaves the
 gradient of its training objective in `p.grad`; the training loop then clips, steps the
 optimizer and logs. Strategies differ only in the objective, so data, optimizer, schedule,
 clipping and initialisation are shared code paths across arms.
 
-Global: the Hutchinson arm optimizes L(θ) + λ · tr(∇²L_sub(θ)), estimated by
-λ · vᵀ H v with one fresh Rademacher probe per step (Hutchinson 1990; used as a training
+Global: the scheduled Hutchinson arm adds a scaled estimate on selected steps,
+using one fresh Rademacher probe per application (Hutchinson 1990; used as a training
 regularizer by SEHT, Liu, Yu & Lin 2022, arXiv:2208.05924). Hv is a double backward, and
 the gradient of the penalty is a third backward pass through that graph.
 """
@@ -54,9 +54,8 @@ class HutchinsonStep:
     `sub_batch` problems of the batch.
 
     Amortization (preregistration addendum 1): the penalty is applied on every `every`-th
-    step with weight `every · λ`, so its expected contribution per step is still λ ∇tr(H)
-    (the same lazy-curvature idea as Sophia's Hessian estimates every k = 10 steps,
-    arXiv:2305.14342). `every = 1` is the plain per-step penalty.
+    step with weight `every · λ`. Unbiasedness holds over probes for that step's
+    sub-batch Hessian. Clipping and AdamW act on the combined gradient; see docs/methods.md.
     """
 
     def __init__(self, lam: float, sub_batch: int, seed: int, every: int = 1):
@@ -81,7 +80,7 @@ class HutchinsonStep:
         self.calls += 1
         if apply:
             # 2) every·λ ∇(vᵀ H_sub v), accumulated into the same .grad buffers. The sub-batch
-            #    forward uses composite LayerNorm, the only op whose native third derivative is wrong.
+            #    forward uses composite LayerNorm; see the scoped operator fixture in audit.py.
             s = self.sub_batch
             with third_order_safe():
                 penalty = hutchinson_penalty(loss_fn(model, x[:s], y[:s], loops[:s]), params, self.gen)

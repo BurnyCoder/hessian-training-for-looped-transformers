@@ -1,0 +1,72 @@
+{
+  "name": "smoke_baseline",
+  "model": {
+    "d_model": 256,
+    "n_layer": 3,
+    "n_head": 8,
+    "mlp_ratio": 4,
+    "vocab_size": 6
+  },
+  "train": {
+    "arm": "baseline",
+    "steps": 60,
+    "batch_size": 64,
+    "lr": 0.0001,
+    "weight_decay": 0.01,
+    "beta1": 0.9,
+    "beta2": 0.999,
+    "grad_clip": 1.0,
+    "seed": 0,
+    "lam": 5e-05,
+    "sub_batch": 4,
+    "penalty_every": 8,
+    "max_train_len": 19,
+    "loop_jitter": 5,
+    "max_train_loops": 20,
+    "log_every": 20,
+    "curvature_every": 30,
+    "curvature_probes": 2,
+    "curvature_batch": 16,
+    "eval_every": 30,
+    "eval_count": 20
+  },
+  "eval": {
+    "id_lengths": [
+      1,
+      5,
+      19
+    ],
+    "ood_lengths": [
+      20,
+      30
+    ],
+    "n_per_length": 20,
+    "extra_loops": 5,
+    "seed_base": 10000,
+    "chunk_size": 250
+  },
+  "measure": {
+    "batch": 32,
+    "seed": 20000,
+    "probes": 3,
+    "power_iters": 3,
+    "power_tol": 0.001,
+    "fisher_samples": 2,
+    "sharpness_rhos": [
+      0.01,
+      0.02,
+      0.05
+    ],
+    "sharpness_draws": 2,
+    "loop_ks": [
+      1,
+      4
+    ],
+    "loop_probes": 2,
+    "loop_power_iters": 2,
+    "chunk_size": 16
+  },
+  "output_dir": "results/smoke",
+  "checkpoint_dir": "checkpoints/smoke",
+  "device": "cuda"
+}

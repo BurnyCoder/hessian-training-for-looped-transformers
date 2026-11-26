@@ -1,0 +1,24 @@
+2026-11-01 19:24:45 INFO smoke_hutchinson: evaluating final.pt on lengths 1..30
+2026-11-01 19:24:45 INFO smoke_hutchinson: eval n=1: oracle acc=0.150 (K=1), max-conf acc=0.000 (K=6), K=n acc=0.150
+2026-11-01 19:24:45 INFO smoke_hutchinson: eval n=5: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=10), K=n acc=0.000
+2026-11-01 19:24:45 INFO smoke_hutchinson: eval n=19: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-01 19:24:45 INFO smoke_hutchinson: eval n=20: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-01 19:24:46 INFO smoke_hutchinson: eval n=30: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-01 19:24:46 INFO smoke_hutchinson: evaluating init.pt on lengths 1..30
+2026-11-01 19:24:46 INFO smoke_hutchinson: eval n=1: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-01 19:24:46 INFO smoke_hutchinson: eval n=5: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-01 19:24:46 INFO smoke_hutchinson: eval n=19: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-01 19:24:46 INFO smoke_hutchinson: eval n=20: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-01 19:24:46 INFO smoke_hutchinson: eval n=30: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-04 01:46:10 INFO smoke_hutchinson: evaluating final.pt on lengths 1..30
+2026-11-04 01:46:10 INFO smoke_hutchinson: eval n=1: oracle acc=0.150 (K=1), max-conf acc=0.000 (K=6), K=n acc=0.150
+2026-11-04 01:46:10 INFO smoke_hutchinson: eval n=5: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=10), K=n acc=0.000
+2026-11-04 01:46:10 INFO smoke_hutchinson: eval n=19: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-04 01:46:10 INFO smoke_hutchinson: eval n=20: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-04 01:46:10 INFO smoke_hutchinson: eval n=30: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-04 01:46:11 INFO smoke_hutchinson: evaluating init.pt on lengths 1..30
+2026-11-04 01:46:11 INFO smoke_hutchinson: eval n=1: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-04 01:46:11 INFO smoke_hutchinson: eval n=5: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-04 01:46:11 INFO smoke_hutchinson: eval n=19: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-04 01:46:11 INFO smoke_hutchinson: eval n=20: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000
+2026-11-04 01:46:11 INFO smoke_hutchinson: eval n=30: oracle acc=0.000 (K=1), max-conf acc=0.000 (K=1), K=n acc=0.000

@@ -1,21 +1,17 @@
-# All experiments
+# Experiment index
 
-The project's experiments in chronological order. Each one links to its own report. Numbers are injected by `main.py report` from `results/`.
-
-| # | Experiment | Date | Status | Report |
-|---|---|---|---|---|
-| 0 | Throughput / memory benchmarks: sets the step budget and forced the deviations; produces no models | 2026-11-01 | done | [Addendum 1 of the preregistration](preregistration.md#addenda), `results/benchmark/*.json` |
-| 1 | **Stage 1:** one exact-Hutchinson-penalized looped transformer vs one plain looped transformer (seed 0) on binary-addition length generalization | 2026-11-01 | see below | [stage1_experiment.md](stage1_experiment.md) |
-| 2 | Stage 2 (deferred): 10 seeds; NSO, SAM, compute-matched and random-direction controls; tuning grid; one-point random-weight-perturbation ablation; looped TinyStories LM | – | preregistered, not run | [preregistration.md](preregistration.md) §5 |
-
-## Experiment 1: Stage 1
+| Experiment | Evidence and status | Record |
+|---|---|---|
+| Throughput and allocator benchmarks | Archived training-step timings on the original machine | [Timing records](../results/benchmark/) |
+| Historical smoke test | Two short plumbing runs, retained separately from the pilot. The corrected replay uses actual stored counts. | [Archive](../results/audit-2026-11-26/) · [Reconstructed summary](../results/audited_smoke_summary.json) |
+| Stage 1 paired pilot | One seed planned, ordinary and intermittent-penalty arms | [Experiment record](stage1_experiment.md) |
+| Independent operator check | Scalar CPU check of native and composite LayerNorm | [Operator record](../results/audit-2026-11-26/layernorm_operator.json) |
+| Stage 2 | Registered, deferred. Paired-seed superiority, practical bounds, curvature, variability and exploratory associations. | [Amendment](preregistration.md) |
 
 <!-- BEGIN:headline -->
-Stage 1 is in progress (finished arms: none).
+**Stage 1 accuracy comparison and final trace check are unevaluated.** The baseline history ends at logged step 6,000 of a 30,000-step budget and includes interim accuracy checks. No Hutchinson run is recorded.
 <!-- END:headline -->
 
 <!-- BEGIN:results_table -->
-Pending.
+Final accuracy measurements pending.
 <!-- END:results_table -->
-
-The full methodology, figures, per-length and curvature tables, output examples and learnings are in [stage1_experiment.md](stage1_experiment.md).

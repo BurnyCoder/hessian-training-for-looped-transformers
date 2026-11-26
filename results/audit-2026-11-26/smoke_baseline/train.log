@@ -1,0 +1,14 @@
+2026-11-01 19:22:50 INFO smoke_baseline: run smoke_baseline: arm=baseline steps=60 seed=0 params=2371328
+2026-11-01 19:22:58 INFO smoke_baseline: step=0 loss=1.718 grad_norm=23.41 lr=9.993e-05 n_max=1 elapsed_s=0.5201 trace_h=-4408 trace_h_se=7418
+2026-11-01 19:23:01 INFO smoke_baseline: step=20 loss=0.7849 grad_norm=36.53 lr=7.27e-05 n_max=13 elapsed_s=4.305
+2026-11-01 19:23:05 INFO smoke_baseline: step=30 trace_h=2.603e+04 trace_h_se=1.314e+04 acc_n5=0 acc_n10=0 acc_n15=0 acc_n19=0 acc_n20=0 acc_n30=0 acc_n40=0
+2026-11-01 19:23:07 INFO smoke_baseline: step=40 loss=0.6957 grad_norm=18.44 lr=2.277e-05 n_max=19 elapsed_s=10.12
+2026-11-01 19:23:12 INFO smoke_baseline: step=59 loss=0.6739 grad_norm=0.7133 lr=0 n_max=19 elapsed_s=13.7 trace_h=2481 trace_h_se=1958 acc_n5=0 acc_n10=0 acc_n15=0 acc_n19=0 acc_n20=0 acc_n30=0 acc_n40=0
+2026-11-01 19:23:12 INFO smoke_baseline: training finished: {'name': 'smoke_baseline', 'status': 'completed', 'steps_done': 60, 'train_seconds': 15.610711336135864, 'n_params': 2371328, 'peak_memory_gb': 4.405786624}
+2026-11-04 01:45:06 INFO smoke_baseline: run smoke_baseline: arm=baseline steps=60 seed=0 params=2371328
+2026-11-04 01:45:18 INFO smoke_baseline: step=0 loss=1.718 grad_norm=23.41 lr=9.993e-05 n_max=1 curriculum_max=1 elapsed_s=0.9008 trace_h=-4408 trace_h_se=7418
+2026-11-04 01:45:20 INFO smoke_baseline: step=20 loss=0.7849 grad_norm=36.53 lr=7.27e-05 n_max=13 curriculum_max=13 elapsed_s=4.744
+2026-11-04 01:45:24 INFO smoke_baseline: step=30 trace_h=2.604e+04 trace_h_se=1.315e+04 acc_n5=0 acc_n10=0 acc_n15=0 acc_n19=0 acc_n20=0 acc_n30=0 acc_n40=0
+2026-11-04 01:45:26 INFO smoke_baseline: step=40 loss=0.6957 grad_norm=18.45 lr=2.277e-05 n_max=19 curriculum_max=19 elapsed_s=10.71
+2026-11-04 01:45:31 INFO smoke_baseline: step=59 loss=0.6739 grad_norm=0.7129 lr=0 n_max=19 curriculum_max=19 elapsed_s=14.23 trace_h=2482 trace_h_se=1958 acc_n5=0 acc_n10=0 acc_n15=0 acc_n19=0 acc_n20=0 acc_n30=0 acc_n40=0
+2026-11-04 01:45:31 INFO smoke_baseline: training finished: {'name': 'smoke_baseline', 'status': 'completed', 'steps_done': 60, 'train_seconds': 16.066412210464478, 'step_seconds': 10.5906400680542, 'n_params': 2371328, 'peak_memory_gb': 4.405786624}

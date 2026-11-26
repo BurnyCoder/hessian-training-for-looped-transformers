@@ -2,3 +2,8 @@
 *.png binary
 *.pdf binary
 *.pt binary
+# Preserve the exact bytes used for the independent audit, including historical CRLF.
+results/audit-2026-11-26/** -text
+results/stage1_baseline/config.json -text
+results/stage1_baseline/history.jsonl -text
+results/stage1_baseline/train.log -text

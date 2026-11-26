@@ -35,7 +35,7 @@ def build_model(cfg: RunConfig) -> LoopedGPT:
 
 
 def fixed_batch(count: int, max_len: int, seed: int):
-    """Problems from the training length distribution read out at K = n (curvature batches)."""
+    """Uniform widths over the planned training range, read out at K=n for a fixed probe set."""
     gen = torch.Generator().manual_seed(seed)
     lengths = torch.randint(1, max_len + 1, (count,), generator=gen)
     x, y = data.make_batch(lengths, gen)
@@ -60,7 +60,7 @@ def benchmark(cfg: RunConfig, n_steps: int, logger, warmup: int = 10) -> dict:
     """Seconds per training step and peak memory at the full length range (post-curriculum).
 
     Lengths are drawn from [1, max_train_len] at every step, the most expensive part of
-    the curriculum, so projected run times are upper bounds. No model is kept.
+    the curriculum. Timing projects the training steps only; diagnostics and measurement are extra.
     """
     tc = cfg.train
     model = build_model(cfg)
@@ -92,6 +92,8 @@ def benchmark(cfg: RunConfig, n_steps: int, logger, warmup: int = 10) -> dict:
 
 def train(cfg: RunConfig, logger) -> dict:
     tc = cfg.train
+    if tc.steps < 1:
+        raise ValueError("training requires a positive step budget")
     os.makedirs(cfg.run_dir, exist_ok=True)
     model = build_model(cfg)
     save_checkpoint(model, cfg, "init.pt")
@@ -105,7 +107,7 @@ def train(cfg: RunConfig, logger) -> dict:
     # Probe seed offset keeps penalty randomness independent of the data stream.
     step_fn = make_step(tc.arm, lam=tc.lam, sub_batch=tc.sub_batch, seed=tc.seed + 1_000_003,
                         every=tc.penalty_every)
-    curv_batch = fixed_batch(tc.curvature_batch, tc.max_train_len, seed=30_000)
+    curv_batch = fixed_batch(tc.curvature_batch, tc.max_train_len, seed=tc.curvature_data_seed)
     history_path = os.path.join(cfg.run_dir, "history.jsonl")
     history = open(history_path, "w", encoding="utf-8")
     t0 = time.time()
@@ -139,10 +141,10 @@ def train(cfg: RunConfig, logger) -> dict:
                       "curriculum_max": data.curriculum_max_len(step, tc.steps, tc.max_train_len),
                       "elapsed_s": time.time() - t0}
         if step % tc.curvature_every == 0 or step == tc.steps - 1:
-            tr = hutchinson_trace(model, curv_batch, tc.curvature_probes, seed=40_000, chunk_size=16)
+            tr = hutchinson_trace(model, curv_batch, tc.curvature_probes, seed=tc.curvature_probe_seed, chunk_size=16)
             record = (record or {"step": step}) | {"trace_h": tr["trace"], "trace_h_se": tr["se"]}
         if (step % tc.eval_every == 0 and step > 0) or step == tc.steps - 1:
-            quick = evaluate_model(model, (5, 10, 15, 19, 20, 30, 40), tc.eval_count, seed_base=50_000,
+            quick = evaluate_model(model, (5, 10, 15, 19, 20, 30, 40), tc.eval_count, seed_base=tc.quick_seed_base,
                                    extra_loops=5, chunk_size=200, device=cfg.device)
             record = (record or {"step": step}) | {f"acc_n{n}": s["oracle"]["acc"] for n, s in quick.items()}
         if record:
@@ -153,7 +155,8 @@ def train(cfg: RunConfig, logger) -> dict:
     history.close()
     train_seconds = time.time() - t0
     save_checkpoint(model, cfg, "final.pt")
-    summary = {"name": cfg.name, "status": status, "steps_done": step + 1, "train_seconds": train_seconds,
+    # Each divergence branch breaks before opt.step(). Count only successful updates.
+    summary = {"name": cfg.name, "status": status, "steps_done": step + int(status == "completed"), "train_seconds": train_seconds,
                "step_seconds": step_seconds,
                "n_params": n_params, "peak_memory_gb": (torch.cuda.max_memory_allocated() / 1e9
                                                         if torch.cuda.is_available() else None)}

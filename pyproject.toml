@@ -1,7 +1,7 @@
 [project]
 name = "looped-hessian"
 version = "0.1.0"
-description = "Hessian-trace regularization (exact Hutchinson penalty; NSO preregistered for Stage 2) for looped transformers: does penalizing curvature improve length generalization?"
+description = "A preregistered study of a stochastic Hessian-trace penalty and length generalization in looped transformers."
 readme = "README.md"
 authors = [
     { name = "Libor \"Burny\" Burian" }

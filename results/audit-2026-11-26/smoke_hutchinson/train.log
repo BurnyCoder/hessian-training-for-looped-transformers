@@ -1,0 +1,14 @@
+2026-11-01 19:23:47 INFO smoke_hutchinson: run smoke_hutchinson: arm=hutchinson steps=60 seed=0 params=2371328
+2026-11-01 19:23:49 INFO smoke_hutchinson: step=0 loss=1.718 vhv=34.98 grad_norm=1364 lr=9.993e-05 n_max=1 elapsed_s=0.7393 trace_h=-3.937e+04 trace_h_se=2.275e+04
+2026-11-01 19:23:57 INFO smoke_hutchinson: step=20 loss=0.8744 grad_norm=3.172 lr=7.27e-05 n_max=13 elapsed_s=9.961
+2026-11-01 19:24:06 INFO smoke_hutchinson: step=30 trace_h=1022 trace_h_se=435.6 acc_n5=0 acc_n10=0 acc_n15=0 acc_n19=0 acc_n20=0 acc_n30=0 acc_n40=0
+2026-11-01 19:24:20 INFO smoke_hutchinson: step=40 loss=0.7609 vhv=-1379 grad_norm=461.8 lr=2.277e-05 n_max=19 elapsed_s=33.14
+2026-11-01 19:24:45 INFO smoke_hutchinson: step=59 loss=0.7377 grad_norm=3.996 lr=0 n_max=19 elapsed_s=55.87 trace_h=7159 trace_h_se=1987 acc_n5=0 acc_n10=0 acc_n15=0 acc_n19=0 acc_n20=0 acc_n30=0 acc_n40=0
+2026-11-01 19:24:45 INFO smoke_hutchinson: training finished: {'name': 'smoke_hutchinson', 'status': 'completed', 'steps_done': 60, 'train_seconds': 57.96927261352539, 'n_params': 2371328, 'peak_memory_gb': 6.871195136}
+2026-11-04 01:45:43 INFO smoke_hutchinson: run smoke_hutchinson: arm=hutchinson steps=60 seed=0 params=2371328
+2026-11-04 01:45:45 INFO smoke_hutchinson: step=0 loss=1.718 vhv=34.98 grad_norm=1364 lr=9.993e-05 n_max=1 curriculum_max=1 elapsed_s=0.7849 trace_h=-3.937e+04 trace_h_se=2.275e+04
+2026-11-04 01:45:49 INFO smoke_hutchinson: step=20 loss=0.8744 grad_norm=3.172 lr=7.27e-05 n_max=13 curriculum_max=13 elapsed_s=6.393
+2026-11-04 01:45:54 INFO smoke_hutchinson: step=30 trace_h=1022 trace_h_se=435.6 acc_n5=0 acc_n10=0 acc_n15=0 acc_n19=0 acc_n20=0 acc_n30=0 acc_n40=0
+2026-11-04 01:46:00 INFO smoke_hutchinson: step=40 loss=0.7609 vhv=-1378 grad_norm=461.8 lr=2.277e-05 n_max=19 curriculum_max=19 elapsed_s=16.86
+2026-11-04 01:46:10 INFO smoke_hutchinson: step=59 loss=0.7377 grad_norm=3.995 lr=0 n_max=19 curriculum_max=19 elapsed_s=25.02 trace_h=7159 trace_h_se=1987 acc_n5=0 acc_n10=0 acc_n15=0 acc_n19=0 acc_n20=0 acc_n30=0 acc_n40=0
+2026-11-04 01:46:10 INFO smoke_hutchinson: training finished: {'name': 'smoke_hutchinson', 'status': 'completed', 'steps_done': 60, 'train_seconds': 26.86298370361328, 'step_seconds': 22.003429412841797, 'n_params': 2371328, 'peak_memory_gb': 4.456523776}

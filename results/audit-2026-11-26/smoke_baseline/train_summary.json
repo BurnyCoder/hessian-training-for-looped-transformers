@@ -1,0 +1,9 @@
+{
+  "name": "smoke_baseline",
+  "status": "completed",
+  "steps_done": 60,
+  "train_seconds": 16.066412210464478,
+  "step_seconds": 10.5906400680542,
+  "n_params": 2371328,
+  "peak_memory_gb": 4.405786624
+}
