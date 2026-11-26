@@ -1,13 +1,4 @@
-"""Statistics for the Stage 1 (one seed per arm) descriptive comparison.
-
-Local: with one training seed per arm, the only uncertainty we can quantify is test-set
-sampling: Wilson intervals for accuracies (statsmodels `proportion_confint`, method
-"wilson") and a paired McNemar test on the same test problems (statsmodels `mcnemar`).
-Neither captures seed-to-seed variance, which is why the preregistered reading rule
-compares the difference against the across-seed SD reported by Kuo et al. 2026.
-
-Global: `report.py` uses these to fill the results table and the Stage 1 verdict.
-"""
+"""Conditional test-sampling uncertainty and the registered single-pair reading rule."""
 
 import math
 
@@ -28,12 +19,31 @@ def wilson(successes: int, n: int) -> tuple[float, float]:
     return float(lo), float(hi)
 
 
+def stratified_interval(counts: list[tuple[int, int]]) -> tuple[float, float]:
+    """Equal-weight mean of simultaneous, exact binomial bounds for fixed length strata.
+
+    Clopper–Pearson is statsmodels' beta method. Bonferroni gives joint coverage of
+    at least 95% without assuming equal success probabilities across lengths.
+    https://www.itl.nist.gov/div898/handbook/prc/section4/prc473.htm
+    """
+    bounds = [proportion_confint(k, n, alpha=0.05 / len(counts), method="beta") for k, n in counts]
+    return tuple(math.fsum(side) / len(bounds) for side in zip(*bounds))
+
+
+def paired_counts(a: list[int], b: list[int]) -> dict:
+    """Count discordances in aligned binary outcomes. Alignment is checked by the caller."""
+    cells = [[0, 0], [0, 0]]
+    for x, y in zip(a, b, strict=True):
+        if x not in (0, 1) or y not in (0, 1):
+            raise ValueError("paired correctness must be binary")
+        cells[x][y] += 1
+    return dict(neither=cells[0][0], only_b=cells[0][1], only_a=cells[1][0], both=cells[1][1])
+
+
 def paired_mcnemar(a: list[int], b: list[int]) -> dict:
-    """McNemar test on paired per-problem correctness of two models on the same problems."""
-    b01 = sum(1 for x, y in zip(a, b) if x == 0 and y == 1)  # only model B correct
-    b10 = sum(1 for x, y in zip(a, b) if x == 1 and y == 0)  # only model A correct
-    both = sum(1 for x, y in zip(a, b) if x == 1 and y == 1)
-    neither = len(a) - b01 - b10 - both
+    """McNemar for prespecified paired predictions. The oracle report uses counts only."""
+    cells = paired_counts(a, b)
+    b01, b10, both, neither = (cells[k] for k in ("only_b", "only_a", "both", "neither"))
     # Exact binomial version for few discordant pairs, chi-square with continuity correction otherwise.
     exact = (b01 + b10) < 25
     res = mcnemar([[neither, b01], [b10, both]], exact=exact, correction=True)

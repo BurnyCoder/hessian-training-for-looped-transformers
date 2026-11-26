@@ -16,6 +16,8 @@ Global: `evaluate_model` produces the per-length JSON that `report.py` turns int
 primary metric (mean oracle accuracy over OOD lengths), figures and tables.
 """
 
+import hashlib
+
 import torch
 
 from looped_hessian import data
@@ -47,7 +49,7 @@ def summarize_length(correct: torch.Tensor, confidence: torch.Tensor, n: int) ->
     acc_per_k = correct.float().mean(dim=1)
 
     def pick(k: int) -> dict:
-        # k is 1-based; per-problem correctness is kept for paired (McNemar) comparisons.
+        # k is one-based. Ordered outcomes support descriptive paired discordance counts.
         return {"k": k, "acc": acc_per_k[k - 1].item(), "correct": correct[k - 1].int().tolist()}
 
     return {
@@ -59,16 +61,21 @@ def summarize_length(correct: torch.Tensor, confidence: torch.Tensor, n: int) ->
     }
 
 
-def evaluate_model(model, lengths, n_per_length: int, seed_base: int, extra_loops: int,
+def evaluate_model(model, lengths, n_per_length: int | dict, seed_base: int, extra_loops: int,
                    chunk_size: int, device, logger=None) -> dict:
     """Evaluate every length in `lengths`; returns {length: summary}."""
     model.eval()
     out = {}
     for n in lengths:
         # Each length has its own seeded test set, disjoint in RNG stream from training data.
-        x, y = data.make_eval_set(n, n_per_length, seed=seed_base + n)
+        x, y = data.make_eval_set(n, data.evaluation_count(n_per_length, n), seed=seed_base + n)
         prof = loop_profile(model, x, y, n + extra_loops, chunk_size, device)
         out[n] = summarize_length(prof["correct"], prof["confidence"], n)
+        # A digest covers ordered operands, targets and shape for alignment across arms.
+        digest = hashlib.sha256(str(tuple(x.shape)).encode("ascii"))
+        for tensor in (x, y):
+            digest.update(tensor.numpy().astype("<i8", copy=False).tobytes())
+        out[n]["dataset_sha256"] = digest.hexdigest()
         if logger:
             s = out[n]
             logger.info(f"eval n={n}: oracle acc={s['oracle']['acc']:.3f} (K={s['oracle']['k']}), "

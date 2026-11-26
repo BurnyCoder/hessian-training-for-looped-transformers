@@ -1,4 +1,4 @@
-"""Tests for the training-step strategies, in particular the exact Hutchinson penalty."""
+"""Tests for training-step strategies and derivatives of a sampled Hutchinson quadratic form."""
 
 import torch
 

@@ -1,4 +1,4 @@
-"""Third-order autograd correctness for every op in LoopedGPT (regression test).
+"""Directional third-order regression checks for the selected operations below.
 
 Global context: the Hutchinson penalty's gradient ∇(vᵀHv) is a third derivative of the
 loss. We compare autograd against a central difference of vᵀHv itself (float64, step

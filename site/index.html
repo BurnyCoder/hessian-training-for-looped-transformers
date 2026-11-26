@@ -53,48 +53,54 @@
 <body>
 <main>
   <h1>Hessian-trace regularization for looped transformers</h1>
-  <p>A looped transformer reuses one block of layers K times. Stage 1 trains two otherwise identical looped transformers to add binary numbers of 1–19 bits and tests them on 20, 25, …, 60 bits. One is trained normally; the other also pays λ·tr(H), the Hessian trace (loss curvature), estimated without bias by Hutchinson's estimator with exact Hessian-vector products. Same seed, same initialization, same training problems. Stage 1 compares one seed per arm and is descriptive only.</p>
+  <p>Does penalizing loss curvature help a looped transformer add longer binary numbers? The registered pilot pairs two runs by seed. The treatment adds an intermittent single-probe penalty on a sub-batch. Each curve below comes from a saved experiment record.</p>
   <p class="links">
     <a href="https://github.com/BurnyCoder/hessian-training-for-looped-transformers">GitHub repository</a>
     <a href="https://github.com/BurnyCoder/hessian-training-for-looped-transformers/blob/main/reports/preregistration.md">Preregistration</a>
     <a href="https://github.com/BurnyCoder/hessian-training-for-looped-transformers/blob/main/reports/paper/paper.pdf">Paper (PDF)</a>
-    <a href="https://huggingface.co/BurnyCoder/hessian-looped-transformers">Checkpoints (uploaded after Stage 1 finishes)</a>
+    <a href="https://github.com/BurnyCoder/hessian-training-for-looped-transformers/blob/main/reports/reviews/2026-11-26-scientific-audit.md">Independent evidence audit</a>
   </p>
 
   <h2>Headline</h2>
   <div class="card" id="headline">Loading…</div>
 
-  <h2>Accuracy by operand length</h2>
+  <section id="final-accuracy" hidden><h2>Accuracy by operand length</h2>
   <div class="controls">
     <label>Stopping rule
       <select id="rule">
         <option value="oracle">oracle K (best loop count per length, primary)</option>
-        <option value="max_confidence">max-confidence K (label-free)</option>
+        <option value="max_confidence">batch-confidence K (one per length)</option>
         <option value="fixed_n">K = n</option>
       </select>
     </label>
   </div>
   <div id="acc_len" class="chart"></div>
-  <p class="muted">Dashed line: longest training problem (n = 19). Shaded bands: 95% Wilson intervals (test-set sampling only, not seed variance).</p>
+  <p class="muted">Only the prespecified fixed-depth rule has per-length 95% Wilson intervals. The oracle and confidence rules select a loop count on the scored batch.</p>
 
   <h2>Accuracy by loop count</h2>
   <div class="controls">
     <label>Operand length n <select id="len_pick"></select></label>
   </div>
   <div id="acc_k" class="chart"></div>
-  <p class="muted">Each loop iteration applies the shared block once more. Longer problems need more iterations; the curve shows whether the model keeps its answer stable as it loops.</p>
+  <p class="muted">Each loop applies the shared block once more. The curve shows how exact-match accuracy changes with depth.</p></section>
 
-  <h2>Training</h2>
-  <div class="grid2">
+  <section id="interim" hidden><h2>Recorded training diagnostics</h2>
+  <img id="static-training" hidden style="max-width:100%" alt="Recorded loss, trace with probe standard errors, and interim oracle exact match">
+  <div class="grid2" id="training-charts">
     <div id="loss" class="chart"></div>
     <div id="trace" class="chart"></div>
   </div>
+  <div id="quick-section" hidden>
+    <label>Interim accuracy by operand length <select id="quick-width"></select></label>
+    <div id="quick-accuracy" class="chart"></div>
+    <p class="muted">Each point selects the best loop count on that width’s labeled development examples.</p>
+  </div></section>
 
-  <h2>Curvature at the end of training</h2>
+  <section id="final-curvature" hidden><h2>Curvature at the end of training</h2>
   <div class="grid2">
     <div id="groups" class="chart"></div>
     <div id="loopstudy" class="chart"></div>
-  </div>
+  </div></section>
 
   <h2>Results table</h2>
   <div class="table-wrap" id="results_table"></div>
@@ -115,7 +121,7 @@ const DASH = {baseline: "solid", hutchinson: "dash", untrained: "dot"};
 const SYMBOL = {baseline: "circle", hutchinson: "square", untrained: "triangle-up"};
 
 function layout(title, xt, yt, extra = {}) {
-  return Object.assign({
+  const base = {
     title: {text: title, font: {size: 14, color: css("--ink")}, x: 0, xanchor: "left"},
     paper_bgcolor: css("--surface"), plot_bgcolor: css("--surface"),
     font: {color: css("--ink-2"), size: 12},
@@ -123,50 +129,62 @@ function layout(title, xt, yt, extra = {}) {
     yaxis: {title: {text: yt}, gridcolor: css("--grid"), zeroline: false},
     legend: {orientation: "h", y: -0.25}, margin: {l: 60, r: 20, t: 40, b: 70},
     hovermode: "x unified"
-  }, extra);
+  };
+  return {...base, ...extra, xaxis: {...base.xaxis, ...extra.xaxis}, yaxis: {...base.yaxis, ...extra.yaxis}};
 }
 const cfg = {displaylogo: false, responsive: true};
-const wilson = (k, n) => { const z = 1.96, p = k / n, d = 1 + z*z/n, c = (p + z*z/(2*n)) / d,
-  h = z * Math.sqrt(p*(1-p)/n + z*z/(4*n*n)) / d; return [Math.max(0, c-h), Math.min(1, c+h)]; };
 
-// A missing summary means `main.py report` has not been run and committed for finished runs yet.
+// The snapshot includes saved interim observations even when no final outcomes exist.
 fetch("data/summary.json").then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }).then(S => {
-  const md = s => marked.parse(s || "");
-  document.getElementById("headline").innerHTML = md(S.tables.headline);
-  for (const k of ["results_table", "examples_table", "per_length_table", "curvature_table", "loop_table"])
-    document.getElementById(k).innerHTML = md(S.tables[k]);
-  if (!Object.keys(S.arms).length) return;  // no finished arm yet: only the "in progress" headline
-  const lengths = S.id_lengths.concat(S.ood_lengths);
+  for (const k of ["headline","results_table","examples_table","per_length_table","curvature_table","loop_table"]) {
+    const node = document.getElementById(k);
+    if (window.marked) node.innerHTML = marked.parse(S.tables[k] || "");
+    else node.textContent = (S.tables[k] || "").replaceAll("**", "");
+  }
+  const haveArms = Object.keys(S.arms).length > 0;
+  const haveHistory = Object.keys(S.histories || {}).length > 0;
+  document.getElementById("interim").hidden = !haveHistory;
+  if (!window.Plotly) {
+    if (haveHistory) {
+      const img = document.getElementById("static-training");
+      img.src = "data/training_curves.png"; img.hidden = false;
+      document.getElementById("training-charts").style.display = "none";
+    }
+    return;
+  }
+  document.getElementById("final-accuracy").hidden = !haveArms;
+  document.getElementById("final-curvature").hidden = !Object.values(S.arms).some(a => a.curvature);
+  const lengths = [...new Set(S.id_lengths.concat(S.ood_lengths))].sort((a,b) => a-b);
   const series = Object.assign({}, ...Object.keys(S.arms).map(a => ({[a]: S.arms[a].per_length})),
                                S.untrained ? {untrained: S.untrained.per_length} : {});
-  const firstArm = Object.values(S.arms)[0];
-  const nPer = firstArm.metrics.ood_oracle.n / S.ood_lengths.length;  // problems per length
+  const trainLimits = [...new Set(Object.values(S.arms).map(a => a.config.train.max_train_len))];
 
   function drawAccLen() {
     const rule = document.getElementById("rule").value;
     const traces = [];
     for (const [arm, pl] of Object.entries(series)) {
-      const acc = lengths.map(n => pl[n][rule].acc);
-      const ks = lengths.map(n => pl[n][rule].k);
-      const ci = acc.map(a => wilson(Math.round(a * nPer), nPer));
+      const observed = lengths.filter(n => pl[n]);
+      const cells = observed.map(n => pl[n][rule]);
+      const acc = cells.map(cell => cell.acc);
+      const ks = cells.map(cell => cell.k);
       const col = css("--" + arm);
-      traces.push({x: lengths.concat([...lengths].reverse()), y: ci.map(c => c[1]).concat(ci.map(c => c[0]).reverse()),
+      if (rule === "fixed_n") traces.push({x: observed.concat([...observed].reverse()), y: cells.map(c => c.hi).concat(cells.map(c => c.lo).reverse()),
                    fill: "toself", fillcolor: col + "26", line: {width: 0}, hoverinfo: "skip", showlegend: false});
-      traces.push({x: lengths, y: acc, name: ARM_LABEL[arm], mode: "lines+markers", customdata: ks,
+      traces.push({x: observed, y: acc, name: ARM_LABEL[arm], mode: "lines+markers", customdata: ks,
                    line: {color: col, width: 2, dash: DASH[arm]}, marker: {symbol: SYMBOL[arm], size: 8},
                    hovertemplate: "%{y:.1%} (K=%{customdata})"});
     }
     Plotly.react("acc_len", traces, layout("Exact-match accuracy vs. operand length", "n (bits per operand)", "accuracy",
       {yaxis: {range: [-0.02, 1.02], tickformat: ".0%", gridcolor: css("--grid")},
-       shapes: [{type: "line", x0: 19.5, x1: 19.5, y0: 0, y1: 1, line: {dash: "dash", color: css("--ink-2"), width: 1}}]}), cfg);
+       shapes: trainLimits.length === 1 ? [{type: "line", x0: trainLimits[0]+0.5, x1: trainLimits[0]+0.5, y0: 0, y1: 1, line: {dash: "dash", color: css("--ink-2"), width: 1}}] : []}), cfg);
   }
 
   const pick = document.getElementById("len_pick");
-  for (const n of lengths) pick.add(new Option(n + (n > 19 ? " (OOD)" : ""), n));
+  for (const n of lengths) pick.add(new Option(n + (S.ood_lengths.includes(n) ? " (OOD)" : ""), n));
   pick.value = S.ood_lengths[1] || lengths[0];
   function drawAccK() {
     const n = pick.value;
-    const traces = Object.entries(series).map(([arm, pl]) => ({
+    const traces = Object.entries(series).filter(([, pl]) => pl[n]).map(([arm, pl]) => ({
       x: pl[n].acc_per_k.map((_, i) => i + 1), y: pl[n].acc_per_k, name: ARM_LABEL[arm], mode: "lines+markers",
       line: {color: css("--" + arm), width: 2, dash: DASH[arm]}, marker: {symbol: SYMBOL[arm], size: 7},
       hovertemplate: "K=%{x}: %{y:.1%}"}));
@@ -175,10 +193,28 @@ fetch("data/summary.json").then(r => { if (!r.ok) throw new Error(`HTTP ${r.stat
        shapes: [{type: "line", x0: Number(n), x1: Number(n), y0: 0, y1: 1, line: {dash: "dot", color: css("--ink-2"), width: 1}}]}), cfg);
   }
 
+  const quickPick = document.getElementById("quick-width");
+  const history = Object.entries(S.histories || {});
+  const quickWidths = new Set(history.flatMap(([, rows]) =>
+    rows.flatMap(row => Object.keys(row).filter(k => /^acc_n\d+$/.test(k)).map(k => Number(k.slice(5))))));
+  for (const n of [...quickWidths].sort((a,b) => a-b)) quickPick.add(new Option(n + " bits", n));
+  document.getElementById("quick-section").hidden = !quickWidths.size;
+  function drawQuickAccuracy() {
+    if (!quickWidths.size) return;
+    const key = "acc_n" + quickPick.value;
+    const lines = history.flatMap(([arm, rows]) => {
+      const observed = rows.filter(r => key in r);
+      return observed.length ? [{x: observed.map(r => r.step), y: observed.map(r => r[key]),
+        name: ARM_LABEL[arm], mode: "lines+markers", line: {color: css("--" + arm), dash: DASH[arm]},
+        marker: {symbol: SYMBOL[arm]}, hovertemplate: "%{y:.1%}"}] : [];
+    });
+    Plotly.react("quick-accuracy", lines, layout("Interim oracle exact match", "logged step", "accuracy",
+      {yaxis: {range: [-0.02, 1.02], tickformat: ".0%", gridcolor: css("--grid")}}), cfg);
+  }
+  quickPick.addEventListener("change", drawQuickAccuracy);
   function drawTraining() {
     const loss = [], tr = [];
-    for (const [arm, a] of Object.entries(S.arms)) {
-      const h = a.history || [];
+    for (const [arm, h] of history) {
       const L = h.filter(r => "loss" in r), T = h.filter(r => "trace_h" in r);
       loss.push({x: L.map(r => r.step), y: L.map(r => r.loss), name: ARM_LABEL[arm], mode: "lines",
                  line: {color: css("--" + arm), width: 2, dash: DASH[arm]}});
@@ -187,8 +223,9 @@ fetch("data/summary.json").then(r => { if (!r.ok) throw new Error(`HTTP ${r.stat
                line: {color: css("--" + arm), width: 2, dash: DASH[arm]}, marker: {symbol: SYMBOL[arm], size: 7}});
     }
     Plotly.react("loss", loss, layout("Training loss (log scale)", "step", "cross-entropy",
-      {yaxis: {type: "log", gridcolor: css("--grid")}}), cfg);
-    Plotly.react("trace", tr, layout("tr(H) during training (10 probes, ±1 SE)", "step", "tr(H)"), cfg);
+      {yaxis: {type: "log", dtick: 1, tickformat: ".1~g"}}), cfg);
+    Plotly.react("trace", tr, layout("Interim tr(H) (±1 probe SE)", "logged step", "tr(H)"), cfg);
+    drawQuickAccuracy();
   }
 
   function drawCurvature() {
@@ -210,11 +247,11 @@ fetch("data/summary.json").then(r => { if (!r.ok) throw new Error(`HTTP ${r.stat
 
   document.getElementById("rule").addEventListener("change", drawAccLen);
   pick.addEventListener("change", drawAccK);
-  const drawAll = () => { drawAccLen(); drawAccK(); drawTraining(); drawCurvature(); };
+  const drawAll = () => { if (haveArms) { drawAccLen(); drawAccK(); drawCurvature(); } if (haveHistory) drawTraining(); };
   drawAll();
   matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawAll);
 }).catch(e => { document.getElementById("headline").textContent =
-  "No results published yet (Stage 1 is in progress; data/summary.json: " + e.message + ")."; });
+  "The results snapshot could not be displayed. " + e.message; });
 </script>
 </body>
 </html>

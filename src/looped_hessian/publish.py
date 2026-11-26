@@ -2,8 +2,8 @@
 
 Local: uses the huggingface_hub Python API (`create_repo`, `upload_folder`, `create_collection`,
 `add_collection_item`; https://huggingface.co/docs/huggingface_hub/guides/upload and
-.../guides/collections). Authentication comes from the cached `hf auth login` token, never
-from files in this repository. The model card is generated from `results/stage1_summary.json`,
+https://huggingface.co/docs/huggingface_hub/guides/collections). The Hub client uses its
+configured credentials. The model card is generated from `results/stage1_summary.json`,
 so its numbers match the README and the paper.
 
 Global: called by `main.py publish` after `main.py report`.
@@ -33,13 +33,11 @@ tags:
 - binary-addition
 ---
 
-# Looped transformers trained with and without an exact Hutchinson Hessian-trace penalty
+# Hessian-trace regularization for looped transformers
 
-Stage 1 checkpoints of the preregistered experiment in [{GITHUB_URL}]({GITHUB_URL}): a weight-tied
-3-layer GPT-2 block (d=256, 8 heads, no positional embeddings, input injection) looped K times,
-trained on binary addition with operands of 1–19 bits and tested on 20, 25, …, 60 bits. One model is trained with
-plain cross-entropy (`stage1_baseline`), one with cross-entropy + λ·tr(H) estimated by Hutchinson's
-estimator (`stage1_hutchinson`). Same seed, data stream and initialization.
+The [registered binary addition study]({GITHUB_URL}) compares ordinary cross-entropy with an intermittent,
+single-probe Hutchinson penalty on a token-normalized sub-batch. The per-length oracle uses the evaluation
+labels. Fixed-depth accuracy measures a prespecified stopping rule. Each uploaded arm includes its resolved configuration.
 
 {tables['headline']}
 
@@ -62,7 +60,8 @@ def publish(results_dir: str = "results", checkpoint_dir: str = "checkpoints", p
     api = HfApi()
     with open(os.path.join(results_dir, f"{prefix}summary.json"), encoding="utf-8") as f:
         summary = json.load(f)
-    api.create_repo(REPO_ID, repo_type="model", exist_ok=True)
+    if not summary.get("arms"):
+        raise ValueError("no completed, evaluated arm is available for a checkpoint release")
     with tempfile.TemporaryDirectory() as tmp:
         for arm in summary["arms"]:
             run = prefix + arm
@@ -76,6 +75,7 @@ def publish(results_dir: str = "results", checkpoint_dir: str = "checkpoints", p
         shutil.copy(os.path.join(results_dir, f"{prefix}summary.json"), tmp)
         with open(os.path.join(tmp, "README.md"), "w", encoding="utf-8") as f:
             f.write(model_card(summary))
+        api.create_repo(REPO_ID, repo_type="model", exist_ok=True)
         api.upload_folder(repo_id=REPO_ID, folder_path=tmp, commit_message="Upload Stage 1 checkpoints and results")
     collection = api.create_collection(title=COLLECTION_TITLE, exists_ok=True,
                                        description="Preregistered experiments on Hessian-trace regularization "

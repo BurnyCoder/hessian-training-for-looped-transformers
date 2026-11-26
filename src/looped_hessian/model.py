@@ -12,9 +12,8 @@ h_t = Block(h_{t-1} + e), h_0 = 0.
 Global: `forward(x, loops)` reads each sample's output at its own loop count K_i (used for
 training with randomized loops and for curvature measurement); `iterate_loops` yields the
 logits after every iteration in one pass (used by evaluation to pick the stopping step).
-Attention always runs on PyTorch's MATH SDPA backend: the fused flash / memory-efficient
-kernels do not implement double backward, which the Hutchinson penalty needs, and using
-one backend everywhere keeps numerics identical across training arms.
+Attention uses PyTorch's MATH SDPA backend for higher derivatives and a shared
+backend choice across arms. Numerical equality across executions is not assumed.
 """
 
 import math
@@ -39,16 +38,13 @@ class ModelConfig:
 
 
 class LayerNorm(nn.Module):
-    """LayerNorm with a switchable composite-op path that is correct to any derivative order.
+    """LayerNorm with a composite-op path for the third-order penalty.
 
     Same math and parameters as nn.LayerNorm (Ba et al. 2016, arXiv:1607.06450): normalise
     over the last dimension with biased variance, eps = 1e-5, then elementwise affine.
-    By default the native `F.layer_norm` kernel is used (fast, low memory, and its first and
-    second derivatives agree with finite differences, see tests/test_curvature.py). In
-    PyTorch 2.15.0 its *third* derivative does not (tests/test_third_order.py), which would
-    silently corrupt the gradient of the Hutchinson penalty, so graphs that will be
-    differentiated three times are built inside `third_order_safe()`, which switches every
-    LayerNorm to the composite formula below.
+    By default the native kernel is used. The recorded CPU float64 fixture in
+    results/audit-2026-11-26/layernorm_operator.json shows a native third-directional
+    derivative discrepancy. Build the penalty graph inside `third_order_safe()`.
     """
 
     composite = False  # class-level switch, toggled only by third_order_safe()
@@ -95,7 +91,7 @@ class CausalSelfAttention(nn.Module):
         q, k, v = self.c_attn(x).split(c, dim=2)
         # Reshape to (batch, heads, time, head_dim) as required by scaled_dot_product_attention.
         q, k, v = (z.view(b, t, self.n_head, c // self.n_head).transpose(1, 2) for z in (q, k, v))
-        # MATH backend: differentiable to any order (see module docstring).
+        # Use the same math backend along the paths that need higher derivatives.
         with sdpa_kernel(SDPBackend.MATH):
             y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
         # Merge heads back to (batch, time, d_model) and project.
