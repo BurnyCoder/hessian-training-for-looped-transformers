@@ -1,0 +1,10 @@
+2026-11-01 19:25:09 INFO smoke_hutchinson: tr(H) = 3386 ± 1.2e+03 (SE, 3 probes)
+2026-11-01 19:25:12 INFO smoke_hutchinson: dominant eigenvalue = 5182
+2026-11-01 19:25:14 INFO smoke_hutchinson: Fisher trace = 1302 ± 8.8e+02
+2026-11-01 19:25:14 INFO smoke_hutchinson: loop study K=1: loss=0.7976 tr(H)=2530 lambda_dom=500.3
+2026-11-01 19:25:18 INFO smoke_hutchinson: loop study K=4: loss=0.7569 tr(H)=3174 lambda_dom=2332
+2026-11-04 01:46:14 INFO smoke_hutchinson: tr(H) = 3386 +- 1.2e+03 (SE, 3 probes)
+2026-11-04 01:46:18 INFO smoke_hutchinson: dominant eigenvalue = 5182
+2026-11-04 01:46:19 INFO smoke_hutchinson: Fisher trace = 562.2 +- 2.7e+02
+2026-11-04 01:46:20 INFO smoke_hutchinson: loop study K=1: loss=0.7976 tr(H)=2530 lambda_dom=500.3
+2026-11-04 01:46:21 INFO smoke_hutchinson: loop study K=4: loss=0.7569 tr(H)=3174 lambda_dom=2332
