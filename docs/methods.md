@@ -1,85 +1,36 @@
-# Methods: estimating and penalizing tr(H) in a looped transformer
+# Methods and estimands
 
-## 1. Objective
+## What the treatment changes
 
-L(θ) is the mean cross-entropy over answer tokens, and H(θ) = ∇²_θ L(θ) is its Hessian with respect to all 2.37M parameters. The regularized objective is
+For a batch B, let Tᵢ be the number of supervised tokens in problem i, including EOS. If ℓᵢ is the sum of its token losses, L_B = Σᵢℓᵢ / ΣᵢTᵢ. Right padding and question positions carry the ignore index. Each problem is supervised at its own sampled loop count. Curvature is with respect to the distinct trainable parameters, so tied weights are counted once and derivatives include all their uses through the loop. [Generator](../src/looped_hessian/data.py) · [Loss](../src/looped_hessian/regularizers.py) · [PyTorch cross-entropy reduction](https://docs.pytorch.org/docs/2.15/generated/torch.nn.CrossEntropyLoss.html)
 
-  J(θ) = L(θ) + λ · tr(H(θ)).
+For fixed parameters, fixed sub-batch S and an independent vector of symmetric random signs v, E[vvᵀ] = I. Consequently E[vᵀH_S v] = tr(H_S). Differentiating this finite expectation gives E[∇(vᵀH_S v)] = ∇tr(H_S) at differentiable points. Two reverse-mode derivatives compute H_S v, and a third differentiates the penalty. A single realization can be negative even when the expected trace is positive. For a symmetric matrix the probe variance is twice the sum of squares of the off-diagonal entries. [Hutchinson](https://doi.org/10.1080/03610919008812866) · [Avron and Toledo, Lemma 1](https://doi.org/10.1145/1944345.1944349) · [SEHT-H, Algorithm 1](https://arxiv.org/pdf/2208.05924) · [Hessian-vector product implementation](../src/looped_hessian/linalg.py)
 
-In a looped model the weights are shared across iterations. H therefore collects curvature contributions from every iteration, including cross-iteration terms, through the chain rule over the K applications of the block.
+On an application step the code accumulates ∇L_B + kλ∇(vᵀH_S v), where S contains the first four of 64 sampled problems, k=8 and λ=0.00005. Other steps accumulate ∇L_B. The optimizer clips the **combined** gradient and applies AdamW with its current moments. Even for a randomly ordered batch, the expectation of the sub-batch token ratio can differ from the full-batch ratio. For example, selecting one of two problems uniformly gives equal expected problem weights regardless of their token counts. A deterministic schedule with changing parameters and a nonlinear optimizer supplies no identity equating these updates to dense regularization. Sophia periodically refreshes an optimizer preconditioner, a different use of curvature. [Step implementation](../src/looped_hessian/regularizers.py) · [Training loop](../src/looped_hessian/train.py) · [AdamW](https://arxiv.org/abs/1711.05101) · [Sophia](https://arxiv.org/abs/2305.14342)
 
-## 2. Hutchinson's estimator (exact in expectation)
+## Gaussian smoothing in the deferred NSO arm
 
-For a random vector v with E[v vᵀ] = I, E[vᵀHv] = tr(H) ([Hutchinson 1990](https://doi.org/10.1080/03610919008812866)).
+For isotropic U ∼ N(0, σ²I), symmetry makes the expected average of ∇L(θ+U) and ∇L(θ−U) the gradient of the Gaussian-smoothed loss, provided differentiation can pass through the expectation. Expanding ∇L about θ cancels odd terms. With sufficient smoothness and integrable Taylor remainder, for fixed dimension the leading correction is (σ²/2)∇tr(H) and the expected residual is O(σ⁴). At finite noise the smoothed objective contains higher-order terms. With covariance Σ the second-order loss correction is tr(ΣH)/2, which also specifies which parameters are perturbed. The paper’s ResNet noise grid motivates the registered coefficient; it provides no calibration for this transformer. [Zhang, Li and Ju, §2 and §3.1](https://arxiv.org/html/2306.08553v4)
 
-- **Probe distribution.** Rademacher v (entries ±1) minimizes the estimator's variance among real probes with i.i.d. entries. The variance is 2(‖H‖_F² − Σ_i H_ii²) ([Avron & Toledo 2011](https://doi.org/10.1145/1944345.1944349), Lemma 1).
-- **Computing Hv without forming H.** Use the gradient's vector–Jacobian product: Hv = ∇_θ(∇_θL · v). This is the reverse-over-reverse construction, `vjp(grad(f))`, of the [PyTorch tutorial](https://docs.pytorch.org/tutorials/intermediate/jacobians_hessians.html), here written with `torch.autograd.grad` in `linalg.hvp_from_grads`. (The tutorial notes that forward-over-reverse is usually more memory-efficient; reverse-over-reverse is used here because its graph can be differentiated once more for the penalty.)
-- **Training penalty** (`regularizers.hutchinson_penalty`):
-  ```
-  g  = autograd.grad(L_sub, θ, create_graph=True)     # first order, graph kept
-  Hv = autograd.grad(g · v,  θ, create_graph=True)    # second order, graph kept
-  P  = Hv · v                                         # vᵀ H v
-  (k λ P).backward()                                  # third order: ∇θ (vᵀ H v)
-  ```
-  E_v[∇_θ(vᵀH(θ)v)] = ∇_θ tr(H(θ)), so the update is an unbiased stochastic gradient of J.
-- **Amortization (Addendum 1).** The penalty is added on every k-th step (k = 8) with weight kλ. Averaged over steps, the expected penalty gradient per step is still λ∇tr(H). Sophia uses the same idea to refresh its curvature estimate every k = 10 steps ([arXiv:2305.14342](https://arxiv.org/abs/2305.14342)).
+## Ground truth and stopping rules
 
-## 3. NSO is a finite-difference estimator of the same objective (Stage 2 arm)
+Independent fair bits generate **nominal-width** operands, including leading zeros. Exact match requires every sum bit and EOS. Different training and evaluation RNG streams still permit duplicate operands, especially at short lengths. OOD refers specifically to encoded widths beyond the training range. The fixed measurement set uses uniform training-range lengths and K=n, whereas training also changes its length distribution over time and jitters K. [Data implementation](../src/looped_hessian/data.py) · [Measurement construction](../src/looped_hessian/train.py)
 
-[NSO](https://arxiv.org/abs/2306.08553) uses the update direction d = ½[∇L(θ+U) + ∇L(θ−U)], with U ~ N(0, σ²I).
+At length n the primary diagnostic maximizes the sample mean of exact-match indicators over the tested depths. [Kuo et al., Eq. 3](https://arxiv.org/html/2606.29983v1#S3.SS3) average the **per-example maximum**, with a different search horizon. Maximum confidence chooses one K per length by averaging log maximum-token probabilities over answer positions and then examples. This uses the known answer mask and the whole evaluation batch. Fan et al. studied both individual and batch confidence. Fixed K=n can be applied to a new example using its width. [Scoring](../src/looped_hessian/evaluate.py) · [Fan et al., §4.3, §6.4 and Appendix B](https://arxiv.org/html/2409.15647)
 
-Taylor-expand ∇L around θ:
+Each OOD length has equal weight. The selected oracle and batch-confidence scores and paired oracle discordances are descriptive. Selecting K on test labels can bias the maximum upward, and selecting it on batch confidences couples the decisions across cases. No ordinary binomial interval or nominal McNemar p-value is assigned to those scores. A fair independent bit guess with EOS supplied has single-guess success probability 2⁻⁽ⁿ⁺¹⁾, independent of the true sum distribution. Searching many random guesses would define a different control. [Selection bias](https://jmlr.org/papers/v11/cawley10a.html) · [Statistics](../src/looped_hessian/stats.py)
 
-  ∇L(θ±U) = ∇L(θ) ± H U + ½ ∇³L[U, U] ± O(‖U‖³).
+For fixed K, each length has a Wilson score interval for the conditional success probability. For the mean over m prespecified lengths, calculate exact Clopper–Pearson intervals at error rate 0.05/m separately, then average the lower and upper endpoints with weight 1/m. The union bound gives at least 95% coverage under i.i.d. sampling within each length, conditional on the trained model. This conservative construction also handles zero successes. Both methods describe test sampling conditional on a predictor fixed independently of the scored examples. If the disclosed smoke prefix influences model or analysis choices, nominal coverage on the reused corpus is uncertain. Neither supplies information about variability across training seeds. [statsmodels interval definitions](https://www.statsmodels.org/stable/generated/statsmodels.stats.proportion.proportion_confint.html) · [NIST on simultaneous coverage](https://www.itl.nist.gov/div898/handbook/prc/section4/prc473.htm) · [Yan and Su on stratified alternatives](https://doi.org/10.1198/sbr.2009.0049)
 
-The odd terms cancel in the average:
+## Curvature measurements and their limits
 
-  d = ∇L(θ) + ½ ∇³L[U, U] + O(‖U‖⁴) = ∇L(θ) + ½ ∇_θ(Uᵀ H(θ) U) + O(σ⁴).
+| Quantity | What is estimated |
+|---|---|
+| Signed parameter Hessian trace | On a fixed batch the chunk Hessians combine with supervised-token-count weights. Reusing the same probe across chunks reconstructs the full-batch quadratic form. A group contribution v_gᵀ(Hv)_g is unbiased for its diagonal-block trace; individual draws include cross-block terms. Standard errors describe Monte Carlo probe variation. [Estimator](../src/looped_hessian/curvature.py) · [PyHessian](https://arxiv.org/abs/1912.07145) |
+| Dominant eigenvalue | Power iteration reports a signed Rayleigh quotient, approximating the largest-magnitude eigenvalue when it converges. A fixed iteration cap and a small quotient change are not a spectral certificate. The trace and one eigenvalue cannot determine total negative eigenvalue mass. [PyHessian](https://arxiv.org/abs/1912.07145) |
+| Model Fisher trace | With T supervised tokens, independent categorical labels sampled from their model probabilities and mean sampled-label loss L̂, T E‖∇L̂‖² gives the token-mean conditional model Fisher trace. Cross terms vanish by independent, zero-mean scores. This equals the generalized Gauss–Newton trace for softmax logits and cross-entropy. The observed-label Hessian can be indefinite. [Sophia, Algorithm 2](https://arxiv.org/abs/2305.14342) · [Martens, §8](https://jmlr.org/papers/v21/17-678.html) |
+| Adaptive average sharpness | Average fixed-batch loss change under noise δ=ρ·abs(θ)⊙Z, Z standard normal. Coordinates at zero receive zero perturbation. Scope of the rescaling argument is a function-preserving coordinatewise multiplicative symmetry across the perturbed neighborhood. Weight norms and this measure are diagnostics, insufficient to identify a causal scale mechanism. [Andriushchenko et al.](https://arxiv.org/abs/2302.07011) · [Dinh et al.](https://arxiv.org/abs/1703.04933) |
 
-Here ∇³L[U, U] = ∇_θ(UᵀH(θ)U), because the third-derivative tensor is symmetric. Since E[UUᵀ] = σ²I, taking the expectation gives
+## LayerNorm derivative evidence
 
-  E_U[d] = ∇L(θ) + (σ²/2) ∇ tr(H(θ)) + O(σ⁴).
-
-So NSO is a first-order, finite-difference estimator of the gradient of the same J, with **λ = σ²/2**, and the Hutchinson penalty is its exact-autodiff counterpart. The difference between the two is only in the estimator: probe distribution (Gaussian vs Rademacher), the O(σ⁴) terms, and variance.
-
-## 4. Third-order autodiff correctness and the LayerNorm finding
-
-The penalty's gradient is a third derivative of L.
-
-**How it was checked** (`tests/test_third_order.py`, `tests/test_regularizers.py`):
-- Each op, and the full float64 model, is compared against a central finite difference of vᵀHv itself, along a random direction u.
-- The tests use step h = 1e-5 and a relative tolerance of 1e-5. During development, estimates at other step sizes agreed with it far more closely than the size of the native-LayerNorm error, so that error is not a finite-difference artifact.
-
-**Finding (torch 2.15.0):**
-- `torch.nn.functional.layer_norm` returns a wrong third-order directional derivative. The relative error depends strongly on the random draw, from well under 1% to tens of percent; the composite formula agrees with finite differences to within the tolerance.
-- Rademacher probes expose the error. A probe that only shifts LayerNorm's input by a constant across the normalized dimension (for example all ones on the input, or on a preceding weight matrix without affine LayerNorm parameters) hides it: LayerNorm is invariant to that shift, so vᵀHv is identically zero and autograd and finite differences trivially agree.
-- GELU, math SDPA, embedding, the tied head, cross-entropy and `torch.where` are correct.
-- Native LayerNorm's first and second derivatives are correct (HVP and trace tests).
-
-**Fix:**
-- `model.LayerNorm` uses the native kernel by default.
-- It switches to the composite formula (x−μ)·rsqrt(σ²+ε)·w + b inside `third_order_safe()`, which wraps the penalty's sub-batch forward pass.
-
-## 5. Curvature measurements (`curvature.py`)
-
-Every measurement is of the full-batch loss on a fixed measurement batch. The batch is processed in chunks, with token-count weights w_c, so that L = Σ_c w_c L_c holds exactly. Hessians and gradients combine with the same weights.
-
-| Metric | Estimator | Reference |
-|---|---|---|
-| tr(H), per-group block traces | Hutchinson. The same probes are reused across chunks, so each probe gives vᵀHv of the full batch. SE = sd/√n_probes. Block traces are v_gᵀ(Hv)_g. | Hutchinson 1990; per-block view: [Zhang et al. 2024](https://arxiv.org/abs/2402.16788) |
-| Dominant eigenvalue | Power iteration on H, stopping on relative change < tol. Finds the eigenvalue of largest magnitude, as in PyHessian. | [Yao et al. 2020](https://arxiv.org/abs/1912.07145) |
-| Fisher (= Gauss–Newton for softmax CE) trace | tr(G) = N·E‖∇L̂‖², where L̂ uses labels sampled from the model and N is the number of sampled labels (answer tokens). The cross terms vanish because each score has zero mean. | Batched form: the Gauss–Newton–Bartlett (GNB) estimator of [Sophia](https://arxiv.org/abs/2305.14342) (Alg. 2). Per-example form via the Bartlett identity: [Liu et al. 2023](https://arxiv.org/abs/2210.14199), App. B.1 |
-| Adaptive average sharpness | E_ε[L(θ + ε⊙\|θ\|)] − L(θ), with ε ~ N(0, ρ²I). Invariant to multiplicative reparametrizations that leave the network function unchanged (f(θ⊙c) = f(θ)). | [Andriushchenko et al. 2023](https://arxiv.org/abs/2302.07011), Eq. 1 with c = \|θ\| |
-| Weight norms | L2 norm per group | Scale-invariance caveat: [Dinh et al. 2017](https://arxiv.org/abs/1703.04933) |
-
-Each estimator is tested against float64 finite-difference Hessians of a tiny model (`tests/test_curvature.py`).
-
-## 6. Evaluation and stopping rules (`evaluate.py`)
-
-For each test length n, the model runs K = 1…n+5 iterations in one pass, and every iteration's prediction is scored.
-
-- **Oracle:** the K with the best accuracy for that length. This is the primary metric; it uses labels. It is a per-length variant of the oracle of [Kuo et al. 2026](https://arxiv.org/abs/2606.29983) (Sec. 3.3), which picks the best K *per example* from {1, …, n+2}. Kuo et al.'s numbers are therefore not directly comparable with ours.
-- **Max-confidence:** the K with the highest mean log max-probability over answer positions. Label-free; a batch variant of [Fan et al. 2024](https://arxiv.org/abs/2409.15647), Eq. 2.
-- **K = n.**
-
-Exact match requires all n+1 sum bits and the EOS token to be correct.
+The penalty path implements the same biased-variance LayerNorm formula with primitive tensor operations. The independent audit evaluates a mixed third directional derivative of a scalar, comparing native and composite operators with central differences at several step sizes. The recorded evidence is specific to the tested PyTorch build, CPU, dtype and directions. The original full-model regression remains in the repository; this audit used only an isolated tensor operator. [Operator evidence and exact fixture](../reports/reviews/2026-11-26-scientific-audit.md) · [PyTorch LayerNorm](https://docs.pytorch.org/docs/2.15/generated/torch.nn.LayerNorm.html) · [Model implementation](../src/looped_hessian/model.py)
