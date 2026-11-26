@@ -167,6 +167,23 @@ def test_one_evaluated_arm_and_missing_initial_controls(tmp_path):
     assert "baseline" in report.results_table(result)
 
 
+def test_off_protocol_completed_pair_only_gets_descriptive_results(tmp_path):
+    for arm in ("baseline", "hutchinson"):
+        name = "stage1_" + arm
+        out = tmp_path / name
+        copytree(ARCHIVE / ("smoke_"+arm), out)
+        for kind in ("config", "train_summary"):
+            path = out / (kind+".json")
+            data = load_json(path)
+            data["name"] = name
+            path.write_text(json.dumps(data), encoding="utf-8")
+    result = report.summarize(tmp_path, "stage1_")
+    assert result["pairing"]["verified"] and "reading" not in result["comparison"]
+    assert "train.steps" in result["registration_deviations"]["accuracy"]
+    assert "measure.probes" in result["registration_deviations"]["curvature"]
+    assert "manipulation_check" not in result and result["trace_diagnostic"]["probe_count"] == 3
+
+
 def test_future_smoke_streams_and_historical_input_prefixes():
     from looped_hessian.config import RunConfig, smoke_config
     from looped_hessian.audit import reconstruct

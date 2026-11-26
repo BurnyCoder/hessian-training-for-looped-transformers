@@ -57,7 +57,7 @@ def validate_eval(ev, cfg):
                     raise ValueError(f"n={n}: same-depth rules disagree about individual outcomes")
 
 
-def run_status(run, arm):
+def run_status(run, arm, name):
     """Only explicit completion at the configured budget qualifies a final evaluation."""
     hist, cfg, train = run["history"], run["config"], run["train"]
     status = {"state": "absent", "reason": "", "last_logged_step": max((r["step"] for r in hist), default=None),
@@ -66,8 +66,8 @@ def run_status(run, arm):
     if not cfg:
         if any(run.values()):
             status.update(state="incomplete", reason="missing run configuration")
-    elif cfg["train"]["arm"] != arm:
-        status.update(state="incomplete", reason="arm name conflicts with run configuration")
+    elif cfg.get("name") != name or cfg["train"]["arm"] != arm:
+        status.update(state="incomplete", reason="directory or arm name conflicts with run configuration")
     elif not train:
         status.update(state="partial_training", reason="no training completion record")
     elif train.get("status", "completed") != "completed":
@@ -114,6 +114,26 @@ def pairing(baseline, treatment):
     evidence = ("ordered input/target SHA-256 digests" if hashed else
                 "legacy deterministic generator, matching length seeds, counts and order")
     return True, evidence + "; shared settings and matching initial decisions"
+
+
+def registered_deviations(runs):
+    """Compare recorded settings to the frozen amended pilot, independently of the directory label."""
+    snapshot = Path(__file__).resolve().parents[2] / "results/audit-2026-11-26/stage1_baseline/config.json"
+    if not snapshot.is_file():
+        return {"accuracy": ["reference configuration unavailable"], "curvature": ["reference configuration unavailable"]}
+    reference = json.loads(snapshot.read_text(encoding="utf-8"))
+    differences = {"accuracy": set(), "curvature": set()}
+    for arm, run in runs.items():
+        for group in ("model", "train", "eval", "measure"):
+            for key, expected in reference[group].items():
+                if group == "train" and (key == "arm" or arm == "baseline" and key in ("lam", "sub_batch", "penalty_every")):
+                    continue
+                if run["config"][group].get(key) != expected:
+                    endpoint = "curvature" if group == "measure" else "accuracy"
+                    differences[endpoint].add(f"{group}.{key}")
+                    if group in ("model", "train"):
+                        differences["curvature"].add(f"{group}.{key}")
+    return {key: sorted(fields) for key, fields in differences.items()}
 
 
 def pooled(ev, lengths, rule):

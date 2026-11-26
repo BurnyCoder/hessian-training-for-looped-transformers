@@ -9,7 +9,7 @@ import subprocess
 from pathlib import Path
 
 from looped_hessian import plots
-from looped_hessian.artifacts import load_run, metrics, pairing, per_length, pooled, run_status
+from looped_hessian.artifacts import load_run, metrics, pairing, per_length, pooled, registered_deviations, run_status
 from looped_hessian.stats import SUGGESTIVE_THRESHOLD, paired_counts, stage1_reading
 
 ARMS = ("baseline", "hutchinson")
@@ -20,7 +20,7 @@ DOCS = ("README.md", "reports/stage1_experiment.md", "reports/all_experiments.md
 def summarize(results_dir, prefix):
     """Report each usable arm independently; comparisons require a qualified pair."""
     runs = {a: load_run(Path(results_dir) / (prefix + a)) for a in ARMS}
-    statuses = {a: run_status(r, a) for a, r in runs.items()}
+    statuses = {a: run_status(r, a, prefix + a) for a, r in runs.items()}
     out = {"experiment": "Stage 1" if prefix == "stage1_" else prefix.rstrip("_"),
            "run_status": statuses, "arms": {}, "id_lengths": [], "ood_lengths": [],
            "histories": {a: r["history"] for a, r in runs.items() if r["history"]},
@@ -54,6 +54,8 @@ def summarize(results_dir, prefix):
         out["comparison"] = {"delta_" + key + "_points": 100 * (h[key]["acc"] - b[key]["acc"]) for key in b}
         out["comparison"].update(oracle_discordances=paired_counts(b["ood_oracle"]["correct"], h["ood_oracle"]["correct"]))
         if prefix == "stage1_":
+            out["registration_deviations"] = registered_deviations(runs)
+        if prefix == "stage1_" and not out["registration_deviations"]["accuracy"]:
             out["comparison"].update(reading=stage1_reading(delta), threshold_points=SUGGESTIVE_THRESHOLD)
         cb, ch = (r["curvature"] for r in runs.values())
         design = first["config"]["measure"]
@@ -61,9 +63,10 @@ def summarize(results_dir, prefix):
             tb, th = cb["trace"], ch["trace"]
             if all(t["n_probes"] == design["probes"] and math.isfinite(t["trace"]) and
                    math.isfinite(t["se"]) and t["se"] >= 0 for t in (tb, th)):
-                out["manipulation_check"] = {"passed": th["trace"] + 3*th["se"] < tb["trace"] - 3*tb["se"],
-                                            "trace_baseline": tb["trace"], "trace_hutchinson": th["trace"],
-                                            "probe_count": design["probes"]}
+                check = {"passed": th["trace"] + 3*th["se"] < tb["trace"] - 3*tb["se"],
+                         "trace_baseline": tb["trace"], "trace_hutchinson": th["trace"], "probe_count": design["probes"]}
+                registered = prefix == "stage1_" and not out["registration_deviations"]["curvature"]
+                out["manipulation_check" if registered else "trace_diagnostic"] = check
     return out
 
 
@@ -128,8 +131,16 @@ def headline(s):
             f"Only baseline correct on {counts['only_a']} OOD cases, only Hutchinson on {counts['only_b']}.")
     if "reading" in c:
         line += f" Registered single-seed heuristic ({c['threshold_points']:.1f} points): {c['reading']}."
+    elif s.get("registration_deviations", {}).get("accuracy"):
+        line += " The registered accuracy heuristic is unevaluated because these settings differ: " + ", ".join(s["registration_deviations"]["accuracy"]) + "."
     if "manipulation_check" in s:
         line += " Fixed-batch trace criterion " + ("passed." if s["manipulation_check"]["passed"] else "did not pass.")
+    elif "trace_diagnostic" in s:
+        diagnostic = s["trace_diagnostic"]
+        line += (f" Descriptive trace check with {diagnostic['probe_count']} probes per arm: the treatment’s upper "
+                 "3-SE bound " + ("is" if diagnostic["passed"] else "is not") + " below the baseline’s lower 3-SE bound.")
+        if "registration_deviations" in s:
+            line += " Registered final curvature criterion unevaluated."
     else:
         line += " Final trace manipulation check unevaluated."
     return line
